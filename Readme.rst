@@ -92,6 +92,7 @@ Usage: ``{{#df_building:data|duilding|options}}``
  * ``COLOR`` - returns tiled and coloured image of workshop
  * ``N`` - where N is 0, 1 or 2, specifies building stage (3 by default)
  * ``BUILD_ITEM`` - returns build items with quantities
+ * ``NOWIKI`` - output without wiki formating
 
 Example 1::
 
