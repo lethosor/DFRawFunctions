@@ -711,18 +711,18 @@ class DFRawFunctions
 	public static function getBuilding (&$parser, $data = '', $building = '', $options = '')
 	{
 		// Defining variables and input check
-		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $j = 0; $i = 0; $type_check = 0; $single_tag=array(); $single_tag_counter=0; $item_counter=-1;
-		$tags = self::getTags(self::loadFile($data));  $building=explode(":",$building); 
-		
+		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $j = 0; $i = 0; $type_check = 0; $single_tag=array(); $single_tag_counter=0; $item_counter=-1; $item=array(); $bMagma=FALSE;
+		$tags = self::getTags(self::loadFile($data));  $building=explode(":",$building); $output="EMPTY";
+		if ($building[0]!="BUILDING_FURNACE" and $building[0]!="BUILDING_WORKSHOP" and $building[0]!="NAME"){return ('<span style="color:#ff0000">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');}
 		// $options input check
 		if ($options!="DIM")
 		{
 		$options=explode(":",$options);
 		$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
-		$options_err_check=array("TILE","COLOR","DIM",0,1,2,3,"WORK_LOCATION","BUILD_ITEM");
+		$options_err_check=array("TILE","COLOR","DIM",0,1,2,3,"WORK_LOCATION","BUILD_ITEM","NOWIKI");
 		if (array_diff($options, $options_err_check)!=FALSE 
 			or count($building)!=2)
-		return '<span style="color:#ff0000">Error, check input values!</span>';
+		if ($output==="EMPTY"){$output='<span style="color:#ff0000">Error, check input values!</span>';};
 		}
 		
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
@@ -749,13 +749,16 @@ class DFRawFunctions
 						$color[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
 						break;
 					case "BUILD_ITEM": 
-						$item_counter=$item_counter+1; $single_tag_counter=0;
+						$item_counter++; $single_tag_counter=0;
 						$item[$item_counter]=array_slice($tags[$i],1);
+						$single_tag[$item_counter]='';
+						break;
+					case "NEEDS_MAGMA":
+						$bMagma=TRUE;
 						break;
 				}
-				if (count($tags[$i])==1 and $item_counter >= 0){
-				$single_tag[$item_counter][$single_tag_counter].= $tags[$i][0]; 
-				// echo ($item_counter." ".$single_tag_counter." ". $single_tag[$item_counter][$single_tag_counter]." ");
+				if ((count($tags[$i])==1) and ($item_counter >= 0) and ($tags[$i][0]!="NEEDS_MAGMA")){
+				$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
 				$single_tag_counter++; }
 			
 				// Breaks per-tile extraction if next object
@@ -767,7 +770,7 @@ class DFRawFunctions
 		}
 		// ### Return dimensions
 		if (in_array("DIM",$options))
-			return implode("&#x2715;",$dim);
+			if ($output==="EMPTY"){$output=implode("&#x2715;",$dim);};
 		
 		// ### Return tile or colored tile
 		if (in_array("TILE",$options) or in_array("COLOR",$options))
@@ -784,38 +787,132 @@ class DFRawFunctions
 				$tmp='';
 				for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
 				$tmp .= implode(":",$color[$building_stage][$j])."<br/>";
-				$tmp .= implode(":",$color[$building_stage][$dim[1]]);
+				$tmp .= implode(":",$color[$building_stage][$dim[1]]); //Prevents placing <br/> in last position
 				$color=$tmp;
 				$tile_color=self::colorTile($parser, $tile, $color);
 				//echo '<br/>COLOR='. $color;
 			}
 			if (!in_array("COLOR",$options)){$tile_color=self::colorTile($parser, $tile);}
+		
+		if ($output==="EMPTY"){$output=$tile_color;};
 		}
-		return $tile_color;
 		
 		// ### Return items
-		if (in_array("ITEM",$options))
-		{
+		if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
+		{	
 			$tmp='';
-			for ($j = 1; $j <= (count($item)-2); $j++) // Turn array into string.
+			for ($j = 0; $j <= (count($item)-2); $j++) // Turn array into string.
 			$tmp .= implode(":",$item[$j])."<br/>";
 			$tmp .= implode(":",$item[count($item)-1]);
-			$tile=$tmp;
+			$item=$tmp;
+			
+			$tmp='';
+			for ($j = 0; $j <= (count($single_tag)-2); $j++) // Turn array into string.
+			if ($single_tag[$j]){
+			$tmp .= implode(":",$single_tag[$j])."<br/>";}
+			else {$tmp .='<br/>';}
+			$tmp .= implode(":",$single_tag[count($single_tag)-1]);
+			$single_tag=$tmp;
+			
+			if ($output==="EMPTY"){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
 		}
+		
+		if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
+		$output = 'none';
+		
+		if (in_array("NOWIKI",$options))
+		return array( $output, 'nowiki' => true );
+		
+		return $output;
 	}
 	
 	
 	
 	// ###### Returns item parameters based on whatever.
-	public static function getItem (&$parser, $item = '', $options = '')
+	public static function getItem (&$parser, $item = '', $single_tag='', $options = '')
 	{	
-	
-		$tags=array(); $i=0;
-		$options=implode(':',$options);
-		$tags = self::getTags(self::loadFile($data));
-		while ($i<=(count($tags)-1)){
-		$i++;
+		// Transform input into 2D array; 5+ elements are from single_tag
+		// echo $item." ".$single_tag;
+		$item=explode('<br/>',$item); 
+		if ($single_tag){
+		$single_tag=explode('<br/>',$single_tag);
+		for ($i = 0; $i <= (count($item)-1); $i++)
+		$item[$i]=explode(":",($item[$i].":".$single_tag[$i]));}
+		else {for ($i = 0; $i <= (count($item)-1); $i++)
+		$item[$i]=explode(":",$item[$i]);}
+		$tag=array();
+		$tmp='';
+		if ($options=="BUILD_ITEM")
+		{
+			for ($i = 0; $i <= (count($item)-1); $i++){
+				foreach ($item[$i] as &$tag)
+				if ($tag==="NONE")
+				$tag='';
+				if (isset($item[$i][5])){
+				$tmp.="<b>";
+					for ($j = 5; $j <= (count($item[$i])-1); $j++){
+						switch ($item[$i][$j]){
+							case 'FIRE_BUILD_SAFE':
+							$tmp.='F';
+							break;
+							case 'MAGMA_BUILD_SAFE':
+							$tmp.='M';
+							break;
+							case 'CAN_USE_ARTIFACT':
+							$tmp.='A';
+							break;	
+							case 'WORTHLESS_STONE_ONLY':
+							$tmp.='W';
+							break;
+							case 'BUILDMAT':
+							$tmp.='B';
+							break;
+							default:
+							'<span style="color:#ff0000">Define'.$item[$i][$j].' </span>';
+							
+						}
+					}
+				$tmp.="</b> ";
+				}
+				
+				$tmp.=$item[$i][0]." ";
+				switch ($item[$i][1]){
+				case "BAR":			$tmp.=strtolower($item[$i][3].' '.$item[i][1]);break;
+				case "SKIN_TANNED":	$tmp.="leather";					break;
+				case "TOOL":		
+				$tmp.=self::getType($parser, "Masterwork:item_tool_masterwork.txt", "ITEM_TOOL","ITEM_TOOL".":".$item[$i][2], "NAME", "FIRST_ONLY");								  break;
+				case "ANVIL":		$tmp.=strtolower($item[$i][1]);		break;
+				case "BLOCKS":		$tmp.=strtolower($item[$i][1]);		break;
+				case "TRAPPARTS":	$tmp.="mechanism";					break;
+				case "WOOD":		$tmp.=strtolower($item[$i][4]." ".$item[$i][1]);break;
+				case "CHAIR":		$tmp.=strtolower($item[$i][1]);		break;
+				case "CHAIN":		$tmp.=strtolower($item[$i][1]);		break;
+				case "TOY":	
+				
+				$tmp.=self::getType($parser, "Masterwork:item_toy_Masterwork.txt", "ITEM_TOY","ITEM_TOY".":".$item[$i][2], "NAME", "FIRST_ONLY").self::getType($parser, "Masterwork:item_tool.txt", "ITEM_TOY","ITEM_TOY".":".$item[$i][2], "NAME", "FIRST_ONLY");
+																		break;
+				case "GRATE":		$tmp.=strtolower($item[$i][1]);		break;
+				case "CAGE":		$tmp.=strtolower($item[$i][1]);		break;
+				case "PIPE_SECTION":$tmp.="pipe section";				break;
+				case "QUERN":		$tmp.=strtolower($item[$i][1]);		break;
+				case "BALLISTAPARTS":$tmp.="ballista parts";			break;
+				case "CATAPULTPARTS":$tmp.="catapult parts";			break;
+				case "WEAPON":
+				if ($item[$i][2]=="ITEM_WEAPON_CROSSBOW"){$tmp.="crossbow";}
+																		break;
+				
+				
+				default:
+				if ($tmp!=''){
+				$tmp.='<span style="color:#ff0000">Define '.$item[$i][1].' </span>'; echo $tmp;
+				}
+				}
+				
+				if ($i!=(count($item)-1)){$tmp.=", ";}
+			}
+			return $tmp;
 		}
+		// 'REACTION_CLASS;X', 'HAS_MATERIAL_REACTION_PRODUCT;X', 'UNROTTEN', 'CONTAINS_LYE', 'POTASHABLE', 'NOT_WEB', 'WEB_ONLY', 'EMPTY', 'NOT_CONTAIN_BARREL_ITEM', 'BAG', 'GLASS_MATERIAL', 'BUILDMAT', 'FIRE_BUILD_SAFE', 'MAGMA_BUILD_SAFE', 'CAN_USE_ARTIFACT', 'WORTHLESS_STONE_ONLY', 'ANY_PLANT_MATERIAL', 'ANY_SILK_MATERIAL', 'ANY_YARN_MATERIAL', 'ANY_SOAP_MATERIAL', 'ANY_LEATHER_MATERIAL', 'ANY_BONE_MATERIAL', 'ANY_STRAND_TISSUE', 'ANY_SHELL_MATERIAL', 'ANY_TOOTH_MATERIAL', 'ANY_HORN_MATERIAL', 'ANY_PEARL_MATERIAL', 'USE_BODY_COMPONENT', 'NO_EDGE_ALLOWED', 'NOT_ENGRAVED', 'METAL_ORE;X', 'MIN_DIMENSION;X', 'HAS_TOOL_USE;X';
 	}
 	
 	
