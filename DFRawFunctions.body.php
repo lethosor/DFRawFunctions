@@ -712,17 +712,17 @@ class DFRawFunctions
 	{
 		// Defining variables and input check
 		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $j = 0; $i = 0; $type_check = 0; $single_tag=array(); $single_tag_counter=0; $item_counter=-1; $item=array(); $bMagma=FALSE;
-		$tags = self::getTags(self::loadFile($data));  $building=explode(":",$building); 
+		$tags = self::getTags(self::loadFile($data));  $building=explode(":",$building); $output="EMPTY";
 		if ($building[0]!="BUILDING_FURNACE" and $building[0]!="BUILDING_WORKSHOP" and $building[0]!="NAME"){return ('<span style="color:#ff0000">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');}
 		// $options input check
 		if ($options!="DIM")
 		{
 		$options=explode(":",$options);
 		$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
-		$options_err_check=array("TILE","COLOR","DIM",0,1,2,3,"WORK_LOCATION","BUILD_ITEM");
+		$options_err_check=array("TILE","COLOR","DIM",0,1,2,3,"WORK_LOCATION","BUILD_ITEM","NOWIKI");
 		if (array_diff($options, $options_err_check)!=FALSE 
 			or count($building)!=2)
-		return '<span style="color:#ff0000">Error, check input values!</span>';
+		if ($output==="EMPTY"){$output='<span style="color:#ff0000">Error, check input values!</span>';};
 		}
 		
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
@@ -770,7 +770,7 @@ class DFRawFunctions
 		}
 		// ### Return dimensions
 		if (in_array("DIM",$options))
-			return implode("&#x2715;",$dim);
+			if ($output==="EMPTY"){$output=implode("&#x2715;",$dim);};
 		
 		// ### Return tile or colored tile
 		if (in_array("TILE",$options) or in_array("COLOR",$options))
@@ -794,12 +794,12 @@ class DFRawFunctions
 			}
 			if (!in_array("COLOR",$options)){$tile_color=self::colorTile($parser, $tile);}
 		
-		return $tile_color;	
+		if ($output==="EMPTY"){$output=$tile_color;};
 		}
 		
 		// ### Return items
-		if (in_array("BUILD_ITEM",$options))
-		{
+		if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
+		{	
 			$tmp='';
 			for ($j = 0; $j <= (count($item)-2); $j++) // Turn array into string.
 			$tmp .= implode(":",$item[$j])."<br/>";
@@ -813,8 +813,17 @@ class DFRawFunctions
 			else {$tmp .='<br/>';}
 			$tmp .= implode(":",$single_tag[count($single_tag)-1]);
 			$single_tag=$tmp;
+			
+			if ($output==="EMPTY"){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
 		}
-		return self::getItem($parser, $item, $single_tag, "BUILD_ITEM");
+		
+		if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
+		$output = 'none';
+		
+		if (in_array("NOWIKI",$options))
+		return array( $output, 'nowiki' => true );
+		
+		return $output;
 	}
 	
 	
@@ -839,7 +848,6 @@ class DFRawFunctions
 				foreach ($item[$i] as &$tag)
 				if ($tag==="NONE")
 				$tag='';
-				echo $item[$i][5];
 				if (isset($item[$i][5])){
 				$tmp.="<b>";
 					for ($j = 5; $j <= (count($item[$i])-1); $j++){
@@ -869,22 +877,35 @@ class DFRawFunctions
 				
 				$tmp.=$item[$i][0]." ";
 				switch ($item[$i][1]){
-				case "BAR":
-					$tmp.=strtolower($item[$i][4].$item[i][1]);
-				break;
-				case "SKIN_TANNED":
-					$tmp.="leather";
-				break;
-				case "TOOL":
-					$tmp.=self::getType($parser, "Masterwork:item_tool_masterwork.txt", "ITEM_TOOL","ITEM_TOOL".":".$item[$i][2], "NAME", "FIRST_ONLY");
-				break;
-				case "ANVIL":
-					$tmp.=strtolower($item[$i][1]);
-				break;
-				case "BLOCKS":
-					$tmp.=strtolower($item[$i][1]);
-				break;
+				case "BAR":			$tmp.=strtolower($item[$i][3].' '.$item[i][1]);break;
+				case "SKIN_TANNED":	$tmp.="leather";					break;
+				case "TOOL":		
+				$tmp.=self::getType($parser, "Masterwork:item_tool_masterwork.txt", "ITEM_TOOL","ITEM_TOOL".":".$item[$i][2], "NAME", "FIRST_ONLY");								  break;
+				case "ANVIL":		$tmp.=strtolower($item[$i][1]);		break;
+				case "BLOCKS":		$tmp.=strtolower($item[$i][1]);		break;
+				case "TRAPPARTS":	$tmp.="mechanism";					break;
+				case "WOOD":		$tmp.=strtolower($item[$i][4]." ".$item[$i][1]);break;
+				case "CHAIR":		$tmp.=strtolower($item[$i][1]);		break;
+				case "CHAIN":		$tmp.=strtolower($item[$i][1]);		break;
+				case "TOY":	
 				
+				$tmp.=self::getType($parser, "Masterwork:item_toy_Masterwork.txt", "ITEM_TOY","ITEM_TOY".":".$item[$i][2], "NAME", "FIRST_ONLY").self::getType($parser, "Masterwork:item_tool.txt", "ITEM_TOY","ITEM_TOY".":".$item[$i][2], "NAME", "FIRST_ONLY");
+																		break;
+				case "GRATE":		$tmp.=strtolower($item[$i][1]);		break;
+				case "CAGE":		$tmp.=strtolower($item[$i][1]);		break;
+				case "PIPE_SECTION":$tmp.="pipe section";				break;
+				case "QUERN":		$tmp.=strtolower($item[$i][1]);		break;
+				case "BALLISTAPARTS":$tmp.="ballista parts";			break;
+				case "CATAPULTPARTS":$tmp.="catapult parts";			break;
+				case "WEAPON":
+				if ($item[$i][2]=="ITEM_WEAPON_CROSSBOW"){$tmp.="crossbow";}
+																		break;
+				
+				
+				default:
+				if ($tmp!=''){
+				$tmp.='<span style="color:#ff0000">Define '.$item[$i][1].' </span>'; echo $tmp;
+				}
 				}
 				
 				if ($i!=(count($item)-1)){$tmp.=", ";}
