@@ -597,7 +597,7 @@ class DFRawFunctions
 				if (is_numeric($tmp))
 					$Number=$tmp;
 				if (!is_numeric($tmp) and $tmp!="ORDER" and $tmp!="CHECK" and $tmp!="FORMAT" and $tmp!='' and $tmp!="FIRST_ONLY" and $tmp!="DOUBLES")
-					return '<span style="color:#ff0000">Error, check input values for getType</span>';
+					return '<span class="error">Error, check input values for getType</span>';
 			}unset ($tmp);
 		}
 		if (is_numeric($number)){$Number=$number;}
@@ -652,7 +652,7 @@ class DFRawFunctions
 		if ($Doubles === TRUE)
 		{
 			if	($tmp != array_unique($tmp)){
-			return '<span style="color:#ff0000">Output contains doubles!</span>';}
+			return '<span class="error">Output contains doubles!</span>';}
 			else {return '';}
 		}
 		
@@ -668,7 +668,7 @@ class DFRawFunctions
 		if ($Number == -1)
 			return "Last reaction of the TYPE is: '''". ($e-1) .". ". $tmp[$e-1] .".'''";
 		if ($Number != ($e-1) and $Check)
-			return "'''".'<span style="color:#ff0000">Error: Last '.implode(":",$l_type).' is '.($e-1)." and not ". $Number.".</span>'''";
+			return "'''".'<span class="error">Error: Last '.implode(":",$l_type).' is '.($e-1)." and not ". $Number.".</span>'''";
 		if ($Format)
 			return "'''".($Number).". ". $tmp[$Number] ."''' || " .$description;
 		//otherwise
@@ -713,7 +713,7 @@ class DFRawFunctions
 		// Defining variables and input check
 		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $j = 0; $i = 0; $type_check = 0; $single_tag=array(); $single_tag_counter=0; $item_counter=-1; $item=array(); $bMagma=FALSE;
 		$tags = self::getTags(self::loadFile($data));  $building=explode(":",$building); $output="EMPTY";
-		if ($building[0]!="BUILDING_FURNACE" and $building[0]!="BUILDING_WORKSHOP" and $building[0]!="NAME"){return ('<span style="color:#ff0000">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');}
+		if ($building[0]!="BUILDING_FURNACE" and $building[0]!="BUILDING_WORKSHOP" and $building[0]!="NAME"){return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');}
 		// $options input check
 		if ($options!="DIM")
 		{
@@ -722,7 +722,7 @@ class DFRawFunctions
 		$options_err_check=array("TILE","COLOR","DIM",0,1,2,3,"WORK_LOCATION","BUILD_ITEM","NOWIKI");
 		if (array_diff($options, $options_err_check)!=FALSE 
 			or count($building)!=2)
-		if ($output==="EMPTY"){$output='<span style="color:#ff0000">Error, check input values!</span>';};
+		if ($output==="EMPTY"){$output='<span class="error">Error, check input values!</span>';};
 		}
 		
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
@@ -868,7 +868,7 @@ class DFRawFunctions
 							$tmp.='B';
 							break;
 							default:
-							'<span style="color:#ff0000">Define'.$item[$i][$j].' </span>';
+							'<span class="error">Define '.$item[$i][$j].' </span>';
 							
 						}
 					}
@@ -904,7 +904,7 @@ class DFRawFunctions
 				
 				default:
 				if ($tmp!=''){
-				$tmp.='<span style="color:#ff0000">Define '.$item[$i][1].' </span>'; echo $tmp;
+				$tmp.='<span class="error">Define '.$item[$i][1].' </span>'; echo $tmp;
 				}
 				}
 				
@@ -921,10 +921,10 @@ class DFRawFunctions
 	// meant to be used in par with
 	public static function colorTile (&$parser, $tile='', $color='', $image='', $step='')
 	{	
-		if (($image !=='' and $step==='')or($image ==='' and $step!=='')){return '<span style="color:#ff0000">Either image or step are missing!</span>';}
-		if (gettype($tile)!=="string" and $tile!==''){return '<span style="color:#ff0000">Tile for df_ile must be string!</span>';}
+		if (($image !=='' and $step==='')or($image ==='' and $step!=='')){return '<span class="error">Either image or step are missing!</span>';}
+		if (gettype($tile)!=="string" and $tile!==''){return '<span class="error">Tile for df_ile must be string!</span>';}
 		if (gettype($color)!=="string" and $color!==''){
-		return '<span style="color:#ff0000">Color for df_ile must be string!</span>';}
+		return '<span class="error">Color for df_ile must be string!</span>';}
 		//echo "<br/>TILE (in funct)=".$tile;
 		
 		// -----TILE ONLY-----
@@ -956,7 +956,7 @@ class DFRawFunctions
 			$color_backgr=''; $color_foregr='';
 			$dim_1=substr_count($color,"<br/>")+1;
 			$color=str_replace("<br/>",":",$color);
-			if (isset($dim_check) and ($dim_check[0]!==$dim_0 or $dim_check[1]!==$dim_1)){return '<span style="color:#ff0000">Dimension mismatch for color and tile in colorTile.</span>';}
+			if (isset($dim_check) and ($dim_check[0]!==$dim_0 or $dim_check[1]!==$dim_1)){return '<span class="error">Dimension mismatch for color and tile in colorTile.</span>';}
 			$color=explode(":",$color);
 			$dim_0=count($color)/$dim_1/3;
 			for ($i = 1; $i <= ($dim_0*$dim_1); $i++)
