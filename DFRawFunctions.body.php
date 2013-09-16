@@ -817,13 +817,11 @@ class DFRawFunctions
 			if ($output==="EMPTY"){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
 		}
 		
-		if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
-		{
-		
-		}
-		
 		if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
 		$output = 'none';
+		
+		if (in_array("NOWIKI",$options))
+		return array( $output, 'nowiki' => true );
 		
 		return $output;
 	}
