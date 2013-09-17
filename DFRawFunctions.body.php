@@ -789,7 +789,7 @@ class DFRawFunctions
 		if (strpos($building,";"))
 		{
 			$building=explode(";",$building);
-			foreach $building as &$foo
+			foreach ($building as &$foo)
 			{
 				$foo=explode(":",$foo,2);
 				if (!isset($foo[1]))
@@ -802,135 +802,136 @@ class DFRawFunctions
 			} unset($foo);
 			if (!in_array($building[0][0],$building_check))
 			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
-		}else{
-		$building=explode(":",$building);
-		if (!in_array($building[0],$building_check))
-		return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
-		
-		// $options input check
-		if ($options!="DIM")
-		{
-			$options=explode(":",$options);
-			$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
-			$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
-			if (array_diff($options, $options_err_check)!=FALSE 
-				or count($building)!=2)
-			if ($output===FALSE)
-				$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
 		}
-		
-		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
-		while ($i<=(count($tags)-1)){
-			if ($type_check == 0 and $tags[$i][0] == $building[0] and $tags[$i][1]==$building[1])
-				$type_check = 1;
+		else {
+			$building=explode(":",$building);
+			if (!in_array($building[0],$building_check))
+			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
 			
-			if ($type_check == 1)
+			// $options input check
+			if ($options!="DIM")
 			{
-				switch ($tags[$i][0]){
-					case "DIM" :
-						$dim=array_slice($tags[$i],1,3); 
-						break;
-					case "WORK_LOCATION": 
-						$work_location=$tags[$i][1]."&#x2715".$tags[$i][2];
-						break;
-					case "BLOCK": 
-						$block[$tags[$i][1]]=array_slice($tags[$i],2);
-						break;
-					case "TILE": 
-						$tile[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
-						break;
-					case "COLOR": 
-						$color[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
-						break;
-					case "BUILD_ITEM": 
-						$item_counter++; $single_tag_counter=0;
-						$item[$item_counter]=array_slice($tags[$i],1);
-						$single_tag[$item_counter]='';
-						break;
-					case "NEEDS_MAGMA":
-						$bMagma=TRUE;
+				$options=explode(":",$options);
+				$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
+				$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
+				if (array_diff($options, $options_err_check)!=FALSE 
+					or count($building)!=2)
+				if ($output===FALSE)
+					$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
+			}
+			
+			// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
+			while ($i<=(count($tags)-1)){
+				if ($type_check == 0 and $tags[$i][0] == $building[0] and $tags[$i][1]==$building[1])
+					$type_check = 1;
+				
+				if ($type_check == 1)
+				{
+					switch ($tags[$i][0]){
+						case "DIM" :
+							$dim=array_slice($tags[$i],1,3); 
+							break;
+						case "WORK_LOCATION": 
+							$work_location=$tags[$i][1]."&#x2715".$tags[$i][2];
+							break;
+						case "BLOCK": 
+							$block[$tags[$i][1]]=array_slice($tags[$i],2);
+							break;
+						case "TILE": 
+							$tile[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
+							break;
+						case "COLOR": 
+							$color[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
+							break;
+						case "BUILD_ITEM": 
+							$item_counter++; $single_tag_counter=0;
+							$item[$item_counter]=array_slice($tags[$i],1);
+							$single_tag[$item_counter]='';
+							break;
+						case "NEEDS_MAGMA":
+							$bMagma=TRUE;
+							break;
+					}
+					if ((count($tags[$i])==1) and ($item_counter >= 0) and ($tags[$i][0]!="NEEDS_MAGMA")){
+					$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
+					$single_tag_counter++; }
+				
+					// Breaks per-tile extraction if next object
+					if ($tags[$i][0]==$building[0] and $tags[$i][1]!=$building[1])
 						break;
 				}
-				if ((count($tags[$i])==1) and ($item_counter >= 0) and ($tags[$i][0]!="NEEDS_MAGMA")){
-				$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
-				$single_tag_counter++; }
-			
-				// Breaks per-tile extraction if next object
-				if ($tags[$i][0]==$building[0] and $tags[$i][1]!=$building[1])
-					break;
+				$i++;	
+				
 			}
-			$i++;	
+			// ### Return dimensions
+			if (in_array("DIM",$options))
+				if ($output===FALSE){$output=implode("&#x2715;",$dim);};
 			
-		}
-		// ### Return dimensions
-		if (in_array("DIM",$options))
-			if ($output===FALSE){$output=implode("&#x2715;",$dim);};
-		
-		// ### Return tile or colored tile
-		if (in_array("TILE",$options) or in_array("COLOR",$options))
-		{
-			$tmp='';
-			for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
-			$tmp .= implode(":",$tile[$building_stage][$j])."<br/>";
-			$tmp .= implode(":",$tile[$building_stage][$dim[1]]);
-			$tile=$tmp;
-			
-			if (in_array("COLOR",$options))
+			// ### Return tile or colored tile
+			if (in_array("TILE",$options) or in_array("COLOR",$options))
 			{
 				$tmp='';
 				for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
-				$tmp .= implode(":",$color[$building_stage][$j])."<br/>";
-				$tmp .= implode(":",$color[$building_stage][$dim[1]]); //Prevents placing <br/> in last position
-				$color=$tmp;
-				if (in_array("TILESET",$options)){
+				$tmp .= implode(":",$tile[$building_stage][$j])."<br/>";
+				$tmp .= implode(":",$tile[$building_stage][$dim[1]]);
+				$tile=$tmp;
 				
-				// Turned off colored tilesets 
-				// because of weird squares after saving the page
+				if (in_array("COLOR",$options))
+				{
+					$tmp='';
+					for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
+					$tmp .= implode(":",$color[$building_stage][$j])."<br/>";
+					$tmp .= implode(":",$color[$building_stage][$dim[1]]); //Prevents placing <br/> in last position
+					$color=$tmp;
+					if (in_array("TILESET",$options)){
+					
+					// Turned off colored tilesets 
+					// because of weird squares after saving the page
+					
+					// $tile_color=self::colorTile($parser, $tile, $color, "[[File:Phoebus 16x16.png|link=]]", 16);
+					
+					}else
+					$tile_color=self::colorTile($parser, $tile, $color);
+					//echo '<br/>COLOR='. $color;
+				}
 				
-				// $tile_color=self::colorTile($parser, $tile, $color, "[[File:Phoebus 16x16.png|link=]]", 16);
-				
-				}else
-				$tile_color=self::colorTile($parser, $tile, $color);
-				//echo '<br/>COLOR='. $color;
+				if (!in_array("COLOR",$options))
+				{
+					if (in_array("TILESET",$options)){
+						$tile_color=self::colorTile($parser, $tile, '', "[[File:Phoebus 16x16.png|link=]]", 16);
+					}else
+						$tile_color=self::colorTile($parser, $tile);
+				}
+			
+			if ($output===FALSE){$output=$tile_color;};
 			}
 			
-			if (!in_array("COLOR",$options))
-			{
-				if (in_array("TILESET",$options)){
-					$tile_color=self::colorTile($parser, $tile, '', "[[File:Phoebus 16x16.png|link=]]", 16);
-				}else
-					$tile_color=self::colorTile($parser, $tile);
+			// ### Return items
+			if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
+			{	
+				$tmp='';
+				for ($j = 0; $j <= (count($item)-2); $j++) // Turn array into string.
+				$tmp .= implode(":",$item[$j])."<br/>";
+				$tmp .= implode(":",$item[count($item)-1]);
+				$item=$tmp;
+				
+				$tmp='';
+				for ($j = 0; $j <= (count($single_tag)-2); $j++) // Turn array into string.
+				if ($single_tag[$j]){
+				$tmp .= implode(":",$single_tag[$j])."<br/>";}
+				else {$tmp .='<br/>';}
+				$tmp .= implode(":",$single_tag[count($single_tag)-1]);
+				$single_tag=$tmp;
+				
+				if ($output===FALSE){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
 			}
-		
-		if ($output===FALSE){$output=$tile_color;};
-		}
-		
-		// ### Return items
-		if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
-		{	
-			$tmp='';
-			for ($j = 0; $j <= (count($item)-2); $j++) // Turn array into string.
-			$tmp .= implode(":",$item[$j])."<br/>";
-			$tmp .= implode(":",$item[count($item)-1]);
-			$item=$tmp;
 			
-			$tmp='';
-			for ($j = 0; $j <= (count($single_tag)-2); $j++) // Turn array into string.
-			if ($single_tag[$j]){
-			$tmp .= implode(":",$single_tag[$j])."<br/>";}
-			else {$tmp .='<br/>';}
-			$tmp .= implode(":",$single_tag[count($single_tag)-1]);
-			$single_tag=$tmp;
+			if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
+			$output = 'none';
 			
-			if ($output===FALSE){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
+			if (in_array("NOWIKI",$options))
+			return array( $output, 'nowiki' => true );
 		}
-		
-		if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
-		$output = 'none';
-		
-		if (in_array("NOWIKI",$options))
-		return array( $output, 'nowiki' => true );
-		
 		return $output;
 	}
 	
