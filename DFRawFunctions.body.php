@@ -10,6 +10,9 @@ class DFRawFunctions
 	// Optional 3rd parameter allows specifying an array which will be filled with indentation for each line
 	private static function getTags ($data, $type = '', &$padding = array())
 	{
+		if (!is_array($type))
+		
+		
 		$raws = array();
 		$off = 0;
 		$pad = '';
@@ -81,8 +84,7 @@ class DFRawFunctions
 				$wantfile[$i] = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
 				if (!is_file($wantfile[$i]))
 					if ($output===false){$output=$data;}
-				echo $wantfile[$i];
-				$output.=file_get_contents($wantfile[$i])."/n/r";
+				$output.=file_get_contents($wantfile[$i])."<br/>";
 			}
 			if ($filenames[0][0]=="Masterwork"){$mw=true;}
 		}
@@ -102,7 +104,7 @@ class DFRawFunctions
 		}
 		
 		// Masterwork raw fix
-		if ($mw === TRUE or in_array($options, "FIX!"))
+		if (($mw === TRUE or in_array($options, "FIX!")) and strpos($output,'!NO')!=FALSE)
 		{	
 			$start=0;
 			$words=array();
@@ -156,7 +158,7 @@ class DFRawFunctions
 	// Same as raw(), but allows specifying multiple files and uses the first one it finds
 	public static function raw_mult (&$parser, $datas = array(), $object = '', $id = '', $notfound = '')
 	{
-		foreach ($datas as &$data)
+		foreach ($datas as $data)
 		{
 			$data = self::loadFile($data);
 			$start = strpos($data, '['. $object .':'. $id .']');
@@ -776,9 +778,35 @@ class DFRawFunctions
 	public static function getBuilding (&$parser, $data = '', $building = '', $options = '')
 	{
 		// Defining variables and input check
-		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $j = 0; $i = 0; $type_check = 0; $single_tag=array(); $single_tag_counter=0; $item_counter=-1; $item=array(); $bMagma=FALSE;
-		$tags = self::getTags(self::loadFile($data));  $building=explode(":",$building); $output="EMPTY";
-		if ($building[0]!="BUILDING_FURNACE" and $building[0]!="BUILDING_WORKSHOP" and $building[0]!="NAME"){return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');}
+		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $item=array(); $single_tag=array(); 
+		$j = 0; $i = 0; $type_check = 0;  $single_tag_counter=0; 
+		$item_counter=-1;  $bMagma=FALSE; $output=FALSE;
+		$building_check=array("BUILDING_FURNACE", "BUILDING_WORKSHOP", "NAME");
+		
+		$tags = self::getTags(self::loadFile($data));
+		
+		// If multiple input
+		if (strpos($building,";"))
+		{
+			$building=explode(";",$building);
+			foreach $building as &$foo
+			{
+				$foo=explode(":",$foo,2);
+				if (!isset($foo[1]))
+				{
+					$foo[1]=$foo[0]; $foo[0]=$building[0][0];
+				}else{
+					if (!in_array($foo[0],$building_check))
+					return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+				}
+			} unset($foo);
+			if (!in_array($building[0][0],$building_check))
+			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+		}else{
+		$building=explode(":",$building);
+		if (!in_array($building[0],$building_check))
+		return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+		
 		// $options input check
 		if ($options!="DIM")
 		{
@@ -787,8 +815,8 @@ class DFRawFunctions
 			$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
 			if (array_diff($options, $options_err_check)!=FALSE 
 				or count($building)!=2)
-			if ($output==="EMPTY")
-			$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
+			if ($output===FALSE)
+				$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
 		}
 		
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
@@ -836,7 +864,7 @@ class DFRawFunctions
 		}
 		// ### Return dimensions
 		if (in_array("DIM",$options))
-			if ($output==="EMPTY"){$output=implode("&#x2715;",$dim);};
+			if ($output===FALSE){$output=implode("&#x2715;",$dim);};
 		
 		// ### Return tile or colored tile
 		if (in_array("TILE",$options) or in_array("COLOR",$options))
@@ -874,7 +902,7 @@ class DFRawFunctions
 					$tile_color=self::colorTile($parser, $tile);
 			}
 		
-		if ($output==="EMPTY"){$output=$tile_color;};
+		if ($output===FALSE){$output=$tile_color;};
 		}
 		
 		// ### Return items
@@ -894,7 +922,7 @@ class DFRawFunctions
 			$tmp .= implode(":",$single_tag[count($single_tag)-1]);
 			$single_tag=$tmp;
 			
-			if ($output==="EMPTY"){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
+			if ($output===FALSE){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
 		}
 		
 		if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
