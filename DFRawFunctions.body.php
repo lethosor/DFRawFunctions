@@ -115,7 +115,7 @@ class DFRawFunctions
 				if ($start === FALSE or $end === FALSE or $end-$start > 30)
 					break;
 				$words['corrupted'][] = substr($output,$start,$end-$start+1);
-				echo substr($output,$start,$end-$start);
+				
 				$start=$end;
 			}
 			foreach ($words['corrupted'] as $word)
