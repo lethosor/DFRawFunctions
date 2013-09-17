@@ -5,9 +5,23 @@ error_reporting(E_ALL);
 
 class DFRawFunctions
 {
-	// Takes some raws and returns a 2-dimensional token array
-	// If 2nd parameter is specified, then only tags of the specified type will be returned
-	// Optional 3rd parameter allows specifying an array which will be filled with indentation for each line
+   /**
+	*	Takes some raws and returns a 2-dimensional token array
+	*   If 2nd parameter is specified, then only tags of the specified type will be returned
+	*   Optional 3rd parameter allows specifying an array 
+	*   which will be filled with indentation for each line
+	*	
+	*	Input: {{df_raw:data|type|padding}}
+	*	- data: string, raws
+	*  	- type: tag is returned only if first subtag = type
+	*	- 
+	*	
+	*		
+	*		
+	*  	
+	*  
+	*  
+	**/
 	private static function getTags ($data, $type = '', &$padding = array())
 	{
 		if (!is_array($type))
@@ -48,7 +62,7 @@ class DFRawFunctions
 	*	- some random raws
 	*   Checks if specified strings are valid namespace:filename
 	*  	If it is, then load and return its contents; otherwise, return input data
-	*   Option FIX! fixes masterwork raws, not requiered if Masterwork namespace is mentioned
+	*   Option FIX! fixes masterwork raws, not required if Masterwork namespace is mentioned
     **/
 	private static function loadFile ($data, $options='')
 	{
@@ -64,43 +78,26 @@ class DFRawFunctions
 		if (!is_dir($wgDFRawPath))
 			if ($output===false){$output=$data;}
 		
-		$data = str_replace(array('/', '\\'), '', $data);
+		$filenames = str_replace(array('/', '\\', ' ','<br/>'), '', $data);
 		
-		// if multiple files
-		if (strpos($data,';')!==false)
-		{
-			$filenames=explode(';', $data);
-			foreach ($filenames as $i=>&$filename)
-			{	
-				// echo ", i=".$i.", filename= ".$filename;
-				$filename = explode(':', $filename, 2);
-				if (count($filename) != 2 and $i=0)
-					if ($output===false){$output=$data;}
-				if (count($filename) != 2)
-				{
-				$filename[1]=$filename[0];
-				$filename[0]=$filenames[0][0];
-				}
-				$wantfile[$i] = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
-				if (!is_file($wantfile[$i]))
-					if ($output===false){$output=$data;}
-				$output.=file_get_contents($wantfile[$i])."<br/>";
+		$filenames = self::multiexplode(array(";",":"),$filenames);
+		if ($filenames[0][0]=="Masterwork"){$mw=true;}
+		
+		// main module
+		foreach ($filenames as $i=>&$filename)
+		{	
+		
+			if ($i=0 and count($filename) != 2){$output=$data; break;}
+			if (count($filename)===2){$filename_count=$i;}
+			if (count($filename) != 2)
+			{
+			$filename[1]=$filename[0];
+			$filename[0]=$filenames[$filename_count][0];
 			}
-			if ($filenames[0][0]=="Masterwork"){$mw=true;}
-		}
-		else
-		{ // if only one file
-		$filename = explode(':', $data, 2);
-		if (count($filename) != 2)
-			if ($output===false){$output=$data;}
-		
-		if ($filename[0]=="Masterwork"){$mw=true;}
-			
-		// in case Meph will make a lot of txt files in raws, that could be changed to befit folder structure and not just namespaces
-		$wantfile = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
-		if (!is_file($wantfile))
-			if ($output===false){$output=$data;}
-		$output=file_get_contents($wantfile);
+			// in case Meph will make a lot of txt files in raws, that could be changed to befit folder structure and not just namespaces
+			$wantfile[$i] = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
+			if (!is_file($wantfile[$i])){echo ($wantfile[$i]); $output=$data; break;}
+			$output.=file_get_contents($wantfile[$i]);
 		}
 		
 		// Masterwork raw fix
@@ -135,7 +132,7 @@ class DFRawFunctions
 	{
 		$data = self::loadFile($data);
 		if (!$object)
-			return $data;
+			return ($data);
 		$start = strpos($data, '['. $object .':'. $id .']');
 		if ($start === FALSE)
 			return $notfound;
@@ -789,7 +786,7 @@ class DFRawFunctions
 		if (strpos($building,";"))
 		{
 			$building=explode(";",$building);
-			foreach $building as &$foo
+			foreach ($building as &$foo)
 			{
 				$foo=explode(":",$foo,2);
 				if (!isset($foo[1]))
@@ -802,7 +799,7 @@ class DFRawFunctions
 			} unset($foo);
 			if (!in_array($building[0][0],$building_check))
 			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
-		}else{
+		}else{}
 		$building=explode(":",$building);
 		if (!in_array($building[0],$building_check))
 		return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
@@ -1142,6 +1139,20 @@ class DFRawFunctions
 			} else {$tile_color .='</table>';}
 		}
 		return $tile_color;	
+	}
+	
+	// delimiters has to be an Array
+	// string has to be a String
+	public static function multiexplode ($delimiters,$string) 
+	{
+		$ary = explode($delimiters[0],$string);
+		array_shift($delimiters);
+		if($delimiters != NULL) {
+			foreach($ary as $key => $val) {
+				 $ary[$key] = self::multiexplode($delimiters, $val);
+			}
+		}
+		return  $ary;
 	}
 }
 
