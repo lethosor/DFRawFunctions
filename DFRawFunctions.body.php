@@ -36,30 +36,95 @@ class DFRawFunctions
 		}
 		return $raws;
 	}
-
-	// Checks if the specified string is a valid namespace:filename
-	// If it is, then load and return its contents; otherwise, just return the data as-is
-	private static function loadFile ($data)
+	
+   /** 
+	*	Input:
+	*  	- namespace:filename;namespace:filename;namespace:filename...
+	*	- namespace:filename;filename;filename...
+	*	- namespace:filename
+	*	- some random raws
+	*   Checks if specified strings are valid namespace:filename
+	*  	If it is, then load and return its contents; otherwise, return input data
+	*   Option FIX! fixes masterwork raws, not requiered if Masterwork namespace is mentioned
+    **/
+	private static function loadFile ($data, $options='')
 	{
+		$output=false; $mw=false; $options=explode(":",$options);
+		
+		// checks if reading from disk is enabled
 		global $wgDFRawEnableDisk;
 		if (!$wgDFRawEnableDisk)
-			return $data;
-
+			if ($output===false){$output=$data;}
+		
+		// checks if path exists
 		global $wgDFRawPath;
 		if (!is_dir($wgDFRawPath))
-			return $data;
-
+			if ($output===false){$output=$data;}
+		
+		$data = str_replace(array('/', '\\'), '', $data);
+		
+		// if multiple files
+		if (strpos($data,';')!==false)
+		{
+			$filenames=explode(';', $data);
+			foreach ($filenames as $i=>&$filename)
+			{	
+				// echo ", i=".$i.", filename= ".$filename;
+				$filename = explode(':', $filename, 2);
+				if (count($filename) != 2 and $i=0)
+					if ($output===false){$output=$data;}
+				if (count($filename) != 2)
+				{
+				$filename[1]=$filename[0];
+				$filename[0]=$filenames[0][0];
+				}
+				$wantfile[$i] = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
+				if (!is_file($wantfile[$i]))
+					if ($output===false){$output=$data;}
+				echo $wantfile[$i];
+				$output.=file_get_contents($wantfile[$i])."/n/r";
+			}
+			if ($filenames[0][0]=="Masterwork"){$mw=true;}
+		}
+		else
+		{ // if only one file
 		$filename = explode(':', $data, 2);
 		if (count($filename) != 2)
-			return $data;
-		$filename = str_replace(array('/', '\\'), '', $filename);
-
+			if ($output===false){$output=$data;}
+		
+		if ($filename[0]=="Masterwork"){$mw=true;}
+			
+		// in case Meph will make a lot of txt files in raws, that could be changed to befit folder structure and not just namespaces
 		$wantfile = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
-
 		if (!is_file($wantfile))
-			return $data;
-
-		return file_get_contents($wantfile);
+			if ($output===false){$output=$data;}
+		$output=file_get_contents($wantfile);
+		}
+		
+		// Masterwork raw fix
+		if ($mw === TRUE or in_array($options, "FIX!"))
+		{	
+			$start=0;
+			$words=array();
+			$i=0;
+			while(true)
+			{
+				$start = strpos($output,'!NO',$start);
+				$end = strpos($output, '!', $start+1);
+				
+				if ($start === FALSE or $end === FALSE or $end-$start > 30)
+					break;
+				$words['corrupted'][] = substr($output,$start,$end-$start+1);
+				echo substr($output,$start,$end-$start);
+				$start=$end;
+			}
+			foreach ($words['corrupted'] as $word)
+				$words['fixed']="YES".substr($word,3,-1).'[';
+			
+			$output=str_replace($words['corrupted'], $words['fixed'], $output);
+		}
+		
+		return $output;
 	}
 
 	// Take an entire raw file and extract one entity
@@ -91,7 +156,7 @@ class DFRawFunctions
 	// Same as raw(), but allows specifying multiple files and uses the first one it finds
 	public static function raw_mult (&$parser, $datas = array(), $object = '', $id = '', $notfound = '')
 	{
-		foreach ($datas as $data)
+		foreach ($datas as &$data)
 		{
 			$data = self::loadFile($data);
 			$start = strpos($data, '['. $object .':'. $id .']');
@@ -121,7 +186,7 @@ class DFRawFunctions
 		if ($entry == '')
 			$entry = $type;
 		$tags = self::getTags($data, $type);
-		foreach ($tags as $tag)
+		foreach ($tags as &$tag)
 		{
 			if ($offset >= count($tag))
 				continue;
@@ -145,7 +210,7 @@ class DFRawFunctions
 			$num += count($tags);
 		if (($num < 0) || ($num >= count($tags)))
 			return $notfound;
-		foreach ($tags as $tag)
+		foreach ($tags as &$tag)
 		{
 			if ($offset >= count($tag))
 				continue;
@@ -717,12 +782,13 @@ class DFRawFunctions
 		// $options input check
 		if ($options!="DIM")
 		{
-		$options=explode(":",$options);
-		$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
-		$options_err_check=array("TILE","COLOR","DIM",0,1,2,3,"WORK_LOCATION","BUILD_ITEM","NOWIKI");
-		if (array_diff($options, $options_err_check)!=FALSE 
-			or count($building)!=2)
-		if ($output==="EMPTY"){$output='<span class="error">Error, check input values!</span>';};
+			$options=explode(":",$options);
+			$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
+			$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
+			if (array_diff($options, $options_err_check)!=FALSE 
+				or count($building)!=2)
+			if ($output==="EMPTY")
+			$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
 		}
 		
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
@@ -780,8 +846,7 @@ class DFRawFunctions
 			$tmp .= implode(":",$tile[$building_stage][$j])."<br/>";
 			$tmp .= implode(":",$tile[$building_stage][$dim[1]]);
 			$tile=$tmp;
-		//echo '<br/>TILE='. $tile;
-		//echo "<br/>Building stage =". $building_stage;
+			
 			if (in_array("COLOR",$options))
 			{
 				$tmp='';
@@ -789,10 +854,25 @@ class DFRawFunctions
 				$tmp .= implode(":",$color[$building_stage][$j])."<br/>";
 				$tmp .= implode(":",$color[$building_stage][$dim[1]]); //Prevents placing <br/> in last position
 				$color=$tmp;
+				if (in_array("TILESET",$options)){
+				
+				// Turned off colored tilesets 
+				// because of weird squares after saving the page
+				
+				// $tile_color=self::colorTile($parser, $tile, $color, "[[File:Phoebus 16x16.png|link=]]", 16);
+				
+				}else
 				$tile_color=self::colorTile($parser, $tile, $color);
 				//echo '<br/>COLOR='. $color;
 			}
-			if (!in_array("COLOR",$options)){$tile_color=self::colorTile($parser, $tile);}
+			
+			if (!in_array("COLOR",$options))
+			{
+				if (in_array("TILESET",$options)){
+					$tile_color=self::colorTile($parser, $tile, '', "[[File:Phoebus 16x16.png|link=]]", 16);
+				}else
+					$tile_color=self::colorTile($parser, $tile);
+			}
 		
 		if ($output==="EMPTY"){$output=$tile_color;};
 		}
