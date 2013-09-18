@@ -101,7 +101,7 @@ class DFRawFunctions
 		}
 		
 		// Masterwork raw fix
-		if (($mw === TRUE or in_array($options, "FIX!")) and strpos($output,'!NO')!=FALSE)
+		if (($mw === TRUE or in_array("FIX!", $options)) and strpos($output,'!NO')!=FALSE)
 		{	
 			$start=0;
 			$words=array();
