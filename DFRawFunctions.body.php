@@ -24,8 +24,6 @@ class DFRawFunctions
 	**/
 	private static function getTags ($data, $type = '', &$padding = array())
 	{
-		if (!is_array($type))
-		
 		
 		$raws = array();
 		$off = 0;
@@ -78,7 +76,7 @@ class DFRawFunctions
 		if (!is_dir($wgDFRawPath))
 			if ($output===false){$output=$data;}
 		
-		$filenames = str_replace(array('/', '\\', ' ','<br/>'), '', $data);
+		$filenames = str_replace(array('/', '\\'), '', $data);
 		
 		$filenames = self::multiexplode(array(";",":"),$filenames);
 		if ($filenames[0][0]=="Masterwork"){$mw=true;}
@@ -102,26 +100,7 @@ class DFRawFunctions
 		
 		// Masterwork raw fix
 		if (($mw === TRUE or in_array($options, "FIX!")) and strpos($output,'!NO')!=FALSE)
-		{	
-			$start=0;
-			$words=array();
-			$i=0;
-			while(true)
-			{
-				$start = strpos($output,'!NO',$start);
-				$end = strpos($output, '!', $start+1);
-				
-				if ($start === FALSE or $end === FALSE or $end-$start > 30)
-					break;
-				$words['corrupted'][] = substr($output,$start,$end-$start+1);
-				
-				$start=$end;
-			}
-			foreach ($words['corrupted'] as $word)
-				$words['fixed']="YES".substr($word,3,-1).'[';
-			
-			$output=str_replace($words['corrupted'], $words['fixed'], $output);
-		}
+			$output=masterworkRawFix($output);
 		
 		return $output;
 	}
@@ -760,9 +739,8 @@ class DFRawFunctions
 		if (in_array("CTRL", $keys))
 			$tmp="Ctrl-{$tmp}";
 		$parts = explode('-', $tmp);
-		foreach ($parts as $key => $part) {
-			$parts[$key] = preg_replace('/(.+)/', $replace, $part);
-		}
+		foreach ($parts as &$part) 
+			$part = preg_replace('/(.+)/', $replace, $part);
 		$tmp = implode($join, $parts);
 		return $tmp;
 	}
@@ -771,90 +749,93 @@ class DFRawFunctions
 	
 	/*###DF_BUILDING### Provides information about workshops and furnaces. 
 	building - should be either workshop or furnace with syntax as follows:  "BUILDING_FURNACE:MAGMA_GENERATOR" or "NAME:Magma Generator (Dwarf)".
-	options - DIM returns dimensions, TILE:N returns tiles as xHTML table */
-	public static function getBuilding (&$parser, $data = '', $building = '', $options = '')
+	options - DIM returns dimensions, TILE:N returns tiles as xHTML table
+	
+	building 
+	- BUILDING_FURNACE:SOMETHING;NAME:SOMETHING;SOMETHING
+	*/
+	public static function getBuilding (&$parser, $data = '', $buildings = '', $options = '')
 	{
 		// Defining variables and input check
 		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $item=array(); $single_tag=array(); 
 		$j = 0; $i = 0; $type_check = 0;  $single_tag_counter=0; 
 		$item_counter=-1;  $bMagma=FALSE; $output=FALSE;
-		$building_check=array("BUILDING_FURNACE", "BUILDING_WORKSHOP", "NAME");
+		$building_invalid=array("BUILDING_FURNACE", "BUILDING_WORKSHOP", "NAME");
 		
 		$tags = self::getTags(self::loadFile($data));
 		
-		// If multiple input
-		if (strpos($building,";"))
+		$buildings=self::multiexplode(array(';',':'),$buildings)
+		foreach ($buildings as $i=>&$building)
 		{
-			$building=explode(";",$building);
-			foreach ($building as &$foo)
+		if (count($building)==2)
+			$invalid=array_diff($building[0], $building_invalid);
+			if ($invalid)
+				return "<span class=\"error\">Unrecognized building type: ".implode(', ',$invalid)."</span>";
+			
+			if (!isset($building[1]))
 			{
-				$foo=explode(":",$foo,2);
-				if (!isset($foo[1]))
-				{
-					$foo[1]=$foo[0]; $foo[0]=$building[0][0];
-				}else{
-					if (!in_array($foo[0],$building_check))
-					return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
-				}
-			} unset($foo);
-			if (!in_array($building[0][0],$building_check))
-			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
-		}else{}
-		$building=explode(":",$building);
-		if (!in_array($building[0],$building_check))
-		return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+			$building[1]=$building[0]; 
+			$building[0]="ANY";
+			}
 		
-		// $options input check
-		if ($options!="DIM")
-		{
-			$options=explode(":",$options);
-			$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
-			$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
-			if (array_diff($options, $options_err_check)!=FALSE 
-				or count($building)!=2)
-			if ($output===FALSE)
-				$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
 		}
 		
-		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
-		while ($i<=(count($tags)-1)){
-			if ($type_check == 0 and $tags[$i][0] == $building[0] and $tags[$i][1]==$building[1])
-				$type_check = 1;
+		$options=self::multiexplode(array(';',':'),$options);
+		$options_invalid=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
+		
+		// options_limit checks for unneded options, those will be ommited later
+		$options_limit=$options_invalid;
+		foreach ($options as $option)
+		{
 			
-			if ($type_check == 1)
+			$invalid=array_diff($option, $options_invalid);
+			if ($invalid)
+				return "<span class=\"error\">Unrecognized option: ".implode(', ',$invalid)."</span>";
+			$options_limit=array_diff($options_limit, $option);
+			
+			$building_stage = preg_grep("/[0-2]/",$option);
+			$building_stage = $building_stage[0];
+			if ($building_stage===''){$building_stage=3;}
+		}
+		
+		$shopsum=array(); $shop_N=0;
+		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tag for required buildings
+		foreach ($tags as $i=>$tag)
+		{
+			if (!array_diff($tag[0], array("BUILDING_FURNACE", "BUILDING_WORKSHOP")))
+			$shop_N++;
+			foreach ($buildings as $i=>&$building)
+			if (($building[0]==="ANY" or $tag[0] == $building[0]) and
+			$type_check === 0 and $tag[1] === $building[1])
+				$type_check = true;
+			
+			if ($type_check === true and !in_array($tag[0],$options_limit)))
 			{
-				switch ($tags[$i][0]){
-					case "DIM" :
-						$dim=array_slice($tags[$i],1,3); 
-						break;
-					case "WORK_LOCATION": 
-						$work_location=$tags[$i][1]."&#x2715".$tags[$i][2];
-						break;
-					case "BLOCK": 
-						$block[$tags[$i][1]]=array_slice($tags[$i],2);
-						break;
-					case "TILE": 
-						$tile[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
-						break;
-					case "COLOR": 
-						$color[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
-						break;
-					case "BUILD_ITEM": 
+				switch ($tag[0])
+				{
+					case "DIM":
+						$shopsum[$shop_N][$tag[0]]=array_slice($tag,1,3);break;
+					case "WORK_LOCATION":
+						$shopsum[$shop_N][$tag[0]]=$tag[1]."&#x2715".$tag[2];break;
+					case "BLOCK":
+						$shopsum[$shop_N][$tag[0]][$tag[1]]=array_slice($tag,2);break;
+					case "TILE":
+						$shopsum[$shop_N][$tag[0]][$tag[1]][$tag[2]]=array_slice($tag,3);break;
+					case "COLOR":
+						$shopsum[$shop_N]['color'][$tag[1]][$tag[2]]=array_slice($tag,3);break;
+					case "BUILD_ITEM":
 						$item_counter++; $single_tag_counter=0;
-						$item[$item_counter]=array_slice($tags[$i],1);
-						$single_tag[$item_counter]='';
-						break;
+						$item[$item_counter]=array_slice($tag,1);
+						$single_tag[$item_counter]='';break;
 					case "NEEDS_MAGMA":
-						$bMagma=TRUE;
-						break;
+						$shopsum[$shop_N]['NEEDS_MAGMA']=TRUE;break;
 				}
-				if ((count($tags[$i])==1) and ($item_counter >= 0) and ($tags[$i][0]!="NEEDS_MAGMA")){
-				$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
-				$single_tag_counter++; }
-			
-				// Breaks per-tile extraction if next object
-				if ($tags[$i][0]==$building[0] and $tags[$i][1]!=$building[1])
-					break;
+					if ((count($tag) == 1) and ($item_counter >= 0) and ($tag[0]!="NEEDS_MAGMA")){
+					$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
+					$single_tag_counter++; }
+				
+					// Breaks per-tile extraction if next object
+					if ($tag[0]==$building[0] and $tags[1]!=$building[1])
 			}
 			$i++;	
 			
@@ -958,7 +939,7 @@ class DFRawFunctions
 					for ($j = 5; $j <= (count($item[$i])-1); $j++){
 						switch ($item[$i][$j]){
 							case 'FIRE_BUILD_SAFE':
-							$tmp.='F';
+							$tmp.='{{abbr|F|fire build safe|0}}';
 							break;
 							case 'MAGMA_BUILD_SAFE':
 							$tmp.='M';
@@ -1153,6 +1134,30 @@ class DFRawFunctions
 			}
 		}
 		return  $ary;
+	}
+	
+	// Fix corrupted masterwork raws
+	public static function masterworkRawFix($string)
+	{
+		$start=0;
+		$words=array();
+		$i=0;
+		while(true)
+		{
+			$start = strpos($string,'!NO',$start);
+			$end = strpos($string, '!', $start+1);
+			
+			if ($start === FALSE or $end === FALSE or $end-$start > 30)
+				break;
+			$words['corrupted'][] = substr($string,$start,$end-$start+1);
+			
+			$start=$end;
+		}
+		foreach ($words['corrupted'] as $word)
+			$words['fixed']="YES".substr($word,3,-1).'[';
+		
+		$string=str_replace($words['corrupted'], $words['fixed'], $string);
+		return $string;
 	}
 }
 
