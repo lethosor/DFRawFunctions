@@ -751,14 +751,16 @@ class DFRawFunctions
 	building - should be either workshop or furnace with syntax as follows:  "BUILDING_FURNACE:MAGMA_GENERATOR" or "NAME:Magma Generator (Dwarf)".
 	options - DIM returns dimensions, TILE:N returns tiles as xHTML table
 	
-	building 
-	- BUILDING_FURNACE:SOMETHING;NAME:SOMETHING;SOMETHING
+	building - supports multiple entries, they should be separated by ';'
+	Example:
+	- if 2 parameters: 1st should be BUILDING_FURNACE, BUILDING_WORKSHOP or NAME :INVENTOR;:TAILOR;:Brewery;Inventor's Workbench;Gong
+	
 	*/
 	public static function getBuilding (&$parser, $data = '', $buildings = '', $options = '')
 	{
 		// Defining variables and input check
 		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $item=array(); $single_tag=array(); 
-		$j = 0; $i = 0; $type_check = 0;  $single_tag_counter=0; 
+		$j = 0; $i = 0; $type_check = FALSE;  $single_tag_counter=0; 
 		$item_counter=-1;  $bMagma=FALSE; $output=FALSE;
 		$building_invalid=array("BUILDING_FURNACE", "BUILDING_WORKSHOP", "NAME");
 		
@@ -798,7 +800,7 @@ class DFRawFunctions
 			if ($building_stage===''){$building_stage=3;}
 		}
 		
-		$shopsum=array(); $shop_N=0;
+		$shopsum=array(); $shop_N=-1;
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tag for required buildings
 		foreach ($tags as $i=>$tag)
 		{
@@ -806,10 +808,10 @@ class DFRawFunctions
 			$shop_N++;
 			foreach ($buildings as $i=>&$building)
 			if (($building[0]==="ANY" or $tag[0] == $building[0]) and
-			$type_check === 0 and $tag[1] === $building[1])
+			$type_check === false and $tag[1] === $building[1])
 				$type_check = true;
 			
-			if ($type_check === true and !in_array($tag[0],$options_limit)))
+			if ($type_check === true and !in_array($tag[0],$options_limit)) and $shop_N!=-1)
 			{
 				switch ($tag[0])
 				{
@@ -823,19 +825,26 @@ class DFRawFunctions
 						$shopsum[$shop_N][$tag[0]][$tag[1]][$tag[2]]=array_slice($tag,3);break;
 					case "COLOR":
 						$shopsum[$shop_N]['color'][$tag[1]][$tag[2]]=array_slice($tag,3);break;
+					case "NEEDS_MAGMA":
+						$shopsum[$shop_N]['NEEDS_MAGMA']=TRUE;break;
 					case "BUILD_ITEM":
 						$item_counter++; $single_tag_counter=0;
 						$item[$item_counter]=array_slice($tag,1);
 						$single_tag[$item_counter]='';break;
-					case "NEEDS_MAGMA":
-						$shopsum[$shop_N]['NEEDS_MAGMA']=TRUE;break;
 				}
-					if ((count($tag) == 1) and ($item_counter >= 0) and ($tag[0]!="NEEDS_MAGMA")){
+				
+				// !!! Build item and single tags require attention
+				if ((count($tag) == 1) and ($item_counter >= 0) and ($tag[0]!="NEEDS_MAGMA")){
 					$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
 					$single_tag_counter++; }
 				
 					// Breaks per-tile extraction if next object
-					if ($tag[0]==$building[0] and $tags[1]!=$building[1])
+				if ($tag[0]==$building[0] and $tags[1]!=$building[1] and isset($shopsum[$shop_N]))
+				{
+					$type_check = true;
+					$single_tag_counter=0; 
+					$item_counter=-1;
+				}
 			}
 			$i++;	
 			
