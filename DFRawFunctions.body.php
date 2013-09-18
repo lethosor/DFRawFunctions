@@ -5,9 +5,23 @@ error_reporting(E_ALL);
 
 class DFRawFunctions
 {
-	// Takes some raws and returns a 2-dimensional token array
-	// If 2nd parameter is specified, then only tags of the specified type will be returned
-	// Optional 3rd parameter allows specifying an array which will be filled with indentation for each line
+   /**
+	*	Takes some raws and returns a 2-dimensional token array
+	*   If 2nd parameter is specified, then only tags of the specified type will be returned
+	*   Optional 3rd parameter allows specifying an array 
+	*   which will be filled with indentation for each line
+	*	
+	*	Input: {{df_raw:data|type|padding}}
+	*	- data: string, raws
+	*  	- type: tag is returned only if first subtag = type
+	*	- 
+	*	
+	*		
+	*		
+	*  	
+	*  
+	*  
+	**/
 	private static function getTags ($data, $type = '', &$padding = array())
 	{
 		if (!is_array($type))
@@ -48,7 +62,7 @@ class DFRawFunctions
 	*	- some random raws
 	*   Checks if specified strings are valid namespace:filename
 	*  	If it is, then load and return its contents; otherwise, return input data
-	*   Option FIX! fixes masterwork raws, not requiered if Masterwork namespace is mentioned
+	*   Option FIX! fixes masterwork raws, not required if Masterwork namespace is mentioned
     **/
 	private static function loadFile ($data, $options='')
 	{
@@ -64,43 +78,26 @@ class DFRawFunctions
 		if (!is_dir($wgDFRawPath))
 			if ($output===false){$output=$data;}
 		
-		$data = str_replace(array('/', '\\'), '', $data);
+		$filenames = str_replace(array('/', '\\', ' ','<br/>'), '', $data);
 		
-		// if multiple files
-		if (strpos($data,';')!==false)
-		{
-			$filenames=explode(';', $data);
-			foreach ($filenames as $i=>&$filename)
-			{	
-				// echo ", i=".$i.", filename= ".$filename;
-				$filename = explode(':', $filename, 2);
-				if (count($filename) != 2 and $i=0)
-					if ($output===false){$output=$data;}
-				if (count($filename) != 2)
-				{
-				$filename[1]=$filename[0];
-				$filename[0]=$filenames[0][0];
-				}
-				$wantfile[$i] = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
-				if (!is_file($wantfile[$i]))
-					if ($output===false){$output=$data;}
-				$output.=file_get_contents($wantfile[$i])."<br/>";
+		$filenames = self::multiexplode(array(";",":"),$filenames);
+		if ($filenames[0][0]=="Masterwork"){$mw=true;}
+		
+		// main module
+		foreach ($filenames as $i=>&$filename)
+		{	
+		
+			if ($i=0 and count($filename) != 2){$output=$data; break;}
+			if (count($filename)===2){$filename_count=$i;}
+			if (count($filename) != 2)
+			{
+			$filename[1]=$filename[0];
+			$filename[0]=$filenames[$filename_count][0];
 			}
-			if ($filenames[0][0]=="Masterwork"){$mw=true;}
-		}
-		else
-		{ // if only one file
-		$filename = explode(':', $data, 2);
-		if (count($filename) != 2)
-			if ($output===false){$output=$data;}
-		
-		if ($filename[0]=="Masterwork"){$mw=true;}
-			
-		// in case Meph will make a lot of txt files in raws, that could be changed to befit folder structure and not just namespaces
-		$wantfile = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
-		if (!is_file($wantfile))
-			if ($output===false){$output=$data;}
-		$output=file_get_contents($wantfile);
+			// in case Meph will make a lot of txt files in raws, that could be changed to befit folder structure and not just namespaces
+			$wantfile[$i] = $wgDFRawPath .'/'. $filename[0] .'/'. $filename[1];
+			if (!is_file($wantfile[$i])){echo ($wantfile[$i]); $output=$data; break;}
+			$output.=file_get_contents($wantfile[$i]);
 		}
 		
 		// Masterwork raw fix
@@ -135,7 +132,7 @@ class DFRawFunctions
 	{
 		$data = self::loadFile($data);
 		if (!$object)
-			return $data;
+			return ($data);
 		$start = strpos($data, '['. $object .':'. $id .']');
 		if ($start === FALSE)
 			return $notfound;
@@ -802,136 +799,135 @@ class DFRawFunctions
 			} unset($foo);
 			if (!in_array($building[0][0],$building_check))
 			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+		}else{}
+		$building=explode(":",$building);
+		if (!in_array($building[0],$building_check))
+		return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+		
+		// $options input check
+		if ($options!="DIM")
+		{
+			$options=explode(":",$options);
+			$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
+			$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
+			if (array_diff($options, $options_err_check)!=FALSE 
+				or count($building)!=2)
+			if ($output===FALSE)
+				$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
 		}
-		else {
-			$building=explode(":",$building);
-			if (!in_array($building[0],$building_check))
-			return ('<span class="error">Building should be: BUILDING_WORKSHOP:---, BUILDING_FURNACE:---, NAME:--- !</span>');
+		
+		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
+		while ($i<=(count($tags)-1)){
+			if ($type_check == 0 and $tags[$i][0] == $building[0] and $tags[$i][1]==$building[1])
+				$type_check = 1;
 			
-			// $options input check
-			if ($options!="DIM")
+			if ($type_check == 1)
 			{
-				$options=explode(":",$options);
-				$building_stage = implode(':',array_intersect(array(0,1,2,3),$options)); if ($building_stage===''){$building_stage=3;}
-				$options_err_check=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET");
-				if (array_diff($options, $options_err_check)!=FALSE 
-					or count($building)!=2)
-				if ($output===FALSE)
-					$output="<span class=\"error\">Unrecognized input: ".implode(", ",array_diff($options, $options_err_check)).". </span>";
-			}
-			
-			// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tags.
-			while ($i<=(count($tags)-1)){
-				if ($type_check == 0 and $tags[$i][0] == $building[0] and $tags[$i][1]==$building[1])
-					$type_check = 1;
-				
-				if ($type_check == 1)
-				{
-					switch ($tags[$i][0]){
-						case "DIM" :
-							$dim=array_slice($tags[$i],1,3); 
-							break;
-						case "WORK_LOCATION": 
-							$work_location=$tags[$i][1]."&#x2715".$tags[$i][2];
-							break;
-						case "BLOCK": 
-							$block[$tags[$i][1]]=array_slice($tags[$i],2);
-							break;
-						case "TILE": 
-							$tile[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
-							break;
-						case "COLOR": 
-							$color[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
-							break;
-						case "BUILD_ITEM": 
-							$item_counter++; $single_tag_counter=0;
-							$item[$item_counter]=array_slice($tags[$i],1);
-							$single_tag[$item_counter]='';
-							break;
-						case "NEEDS_MAGMA":
-							$bMagma=TRUE;
-							break;
-					}
-					if ((count($tags[$i])==1) and ($item_counter >= 0) and ($tags[$i][0]!="NEEDS_MAGMA")){
-					$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
-					$single_tag_counter++; }
-				
-					// Breaks per-tile extraction if next object
-					if ($tags[$i][0]==$building[0] and $tags[$i][1]!=$building[1])
+				switch ($tags[$i][0]){
+					case "DIM" :
+						$dim=array_slice($tags[$i],1,3); 
+						break;
+					case "WORK_LOCATION": 
+						$work_location=$tags[$i][1]."&#x2715".$tags[$i][2];
+						break;
+					case "BLOCK": 
+						$block[$tags[$i][1]]=array_slice($tags[$i],2);
+						break;
+					case "TILE": 
+						$tile[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
+						break;
+					case "COLOR": 
+						$color[$tags[$i][1]][$tags[$i][2]]=array_slice($tags[$i],3);
+						break;
+					case "BUILD_ITEM": 
+						$item_counter++; $single_tag_counter=0;
+						$item[$item_counter]=array_slice($tags[$i],1);
+						$single_tag[$item_counter]='';
+						break;
+					case "NEEDS_MAGMA":
+						$bMagma=TRUE;
 						break;
 				}
-				$i++;	
-				
-			}
-			// ### Return dimensions
-			if (in_array("DIM",$options))
-				if ($output===FALSE){$output=implode("&#x2715;",$dim);};
+				if ((count($tags[$i])==1) and ($item_counter >= 0) and ($tags[$i][0]!="NEEDS_MAGMA")){
+				$single_tag[$item_counter][$single_tag_counter] = implode(";",$tags[$i]); 
+				$single_tag_counter++; }
 			
-			// ### Return tile or colored tile
-			if (in_array("TILE",$options) or in_array("COLOR",$options))
+				// Breaks per-tile extraction if next object
+				if ($tags[$i][0]==$building[0] and $tags[$i][1]!=$building[1])
+					break;
+			}
+			$i++;	
+			
+		}
+		// ### Return dimensions
+		if (in_array("DIM",$options))
+			if ($output===FALSE){$output=implode("&#x2715;",$dim);};
+		
+		// ### Return tile or colored tile
+		if (in_array("TILE",$options) or in_array("COLOR",$options))
+		{
+			$tmp='';
+			for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
+			$tmp .= implode(":",$tile[$building_stage][$j])."<br/>";
+			$tmp .= implode(":",$tile[$building_stage][$dim[1]]);
+			$tile=$tmp;
+			
+			if (in_array("COLOR",$options))
 			{
 				$tmp='';
 				for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
-				$tmp .= implode(":",$tile[$building_stage][$j])."<br/>";
-				$tmp .= implode(":",$tile[$building_stage][$dim[1]]);
-				$tile=$tmp;
+				$tmp .= implode(":",$color[$building_stage][$j])."<br/>";
+				$tmp .= implode(":",$color[$building_stage][$dim[1]]); //Prevents placing <br/> in last position
+				$color=$tmp;
+				if (in_array("TILESET",$options)){
 				
-				if (in_array("COLOR",$options))
-				{
-					$tmp='';
-					for ($j = 1; $j <= ($dim[1]-1); $j++) // Turn array into string.
-					$tmp .= implode(":",$color[$building_stage][$j])."<br/>";
-					$tmp .= implode(":",$color[$building_stage][$dim[1]]); //Prevents placing <br/> in last position
-					$color=$tmp;
-					if (in_array("TILESET",$options)){
-					
-					// Turned off colored tilesets 
-					// because of weird squares after saving the page
-					
-					// $tile_color=self::colorTile($parser, $tile, $color, "[[File:Phoebus 16x16.png|link=]]", 16);
-					
-					}else
-					$tile_color=self::colorTile($parser, $tile, $color);
-					//echo '<br/>COLOR='. $color;
-				}
+				// Turned off colored tilesets 
+				// because of weird squares after saving the page
 				
-				if (!in_array("COLOR",$options))
-				{
-					if (in_array("TILESET",$options)){
-						$tile_color=self::colorTile($parser, $tile, '', "[[File:Phoebus 16x16.png|link=]]", 16);
-					}else
-						$tile_color=self::colorTile($parser, $tile);
-				}
-			
-			if ($output===FALSE){$output=$tile_color;};
+				// $tile_color=self::colorTile($parser, $tile, $color, "[[File:Phoebus 16x16.png|link=]]", 16);
+				
+				}else
+				$tile_color=self::colorTile($parser, $tile, $color);
+				//echo '<br/>COLOR='. $color;
 			}
 			
-			// ### Return items
-			if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
-			{	
-				$tmp='';
-				for ($j = 0; $j <= (count($item)-2); $j++) // Turn array into string.
-				$tmp .= implode(":",$item[$j])."<br/>";
-				$tmp .= implode(":",$item[count($item)-1]);
-				$item=$tmp;
-				
-				$tmp='';
-				for ($j = 0; $j <= (count($single_tag)-2); $j++) // Turn array into string.
-				if ($single_tag[$j]){
-				$tmp .= implode(":",$single_tag[$j])."<br/>";}
-				else {$tmp .='<br/>';}
-				$tmp .= implode(":",$single_tag[count($single_tag)-1]);
-				$single_tag=$tmp;
-				
-				if ($output===FALSE){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
+			if (!in_array("COLOR",$options))
+			{
+				if (in_array("TILESET",$options)){
+					$tile_color=self::colorTile($parser, $tile, '', "[[File:Phoebus 16x16.png|link=]]", 16);
+				}else
+					$tile_color=self::colorTile($parser, $tile);
 			}
-			
-			if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
-			$output = 'none';
-			
-			if (in_array("NOWIKI",$options))
-			return array( $output, 'nowiki' => true );
+		
+		if ($output===FALSE){$output=$tile_color;};
 		}
+		
+		// ### Return items
+		if (in_array("BUILD_ITEM",$options) and $item[$j]!='')
+		{	
+			$tmp='';
+			for ($j = 0; $j <= (count($item)-2); $j++) // Turn array into string.
+			$tmp .= implode(":",$item[$j])."<br/>";
+			$tmp .= implode(":",$item[count($item)-1]);
+			$item=$tmp;
+			
+			$tmp='';
+			for ($j = 0; $j <= (count($single_tag)-2); $j++) // Turn array into string.
+			if ($single_tag[$j]){
+			$tmp .= implode(":",$single_tag[$j])."<br/>";}
+			else {$tmp .='<br/>';}
+			$tmp .= implode(":",$single_tag[count($single_tag)-1]);
+			$single_tag=$tmp;
+			
+			if ($output===FALSE){$output=self::getItem($parser, $item, $single_tag, "BUILD_ITEM");};
+		}
+		
+		if (in_array("BUILD_ITEM",$options) and $item[$j]=='')
+		$output = 'none';
+		
+		if (in_array("NOWIKI",$options))
+		return array( $output, 'nowiki' => true );
+		
 		return $output;
 	}
 	
@@ -1143,6 +1139,20 @@ class DFRawFunctions
 			} else {$tile_color .='</table>';}
 		}
 		return $tile_color;	
+	}
+	
+	// delimiters has to be an Array
+	// string has to be a String
+	public static function multiexplode ($delimiters,$string) 
+	{
+		$ary = explode($delimiters[0],$string);
+		array_shift($delimiters);
+		if($delimiters != NULL) {
+			foreach($ary as $key => $val) {
+				 $ary[$key] = self::multiexplode($delimiters, $val);
+			}
+		}
+		return  $ary;
 	}
 }
 
