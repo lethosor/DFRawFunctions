@@ -759,7 +759,7 @@ class DFRawFunctions
 	public static function getBuilding (&$parser, $data = '', $buildings = '', $options = '')
 	{
 		// Defining variables and input check
-		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $item=array(); $single_tag=array(); $shop_filtered=-1;
+		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $item=array(); $single_tag=array();
 		$j = 0; $i = 0; $type_check = FALSE;  $single_tag_counter=0; 
 		$item_counter=-1;  $bMagma=FALSE; $output=FALSE;
 		$building_invalid=array("BUILDING_FURNACE", "BUILDING_WORKSHOP", "NAME");
@@ -782,6 +782,7 @@ class DFRawFunctions
 			}
 		
 		}
+		unset($building);
 		
 		$options=self::multiexplode(array(';',':'),$options);
 		$options_invalid=explode(", ","TILE, COLOR, DIM, 0, 1, 2, 3, WORK_LOCATION, BUILD_ITEM, NOWIKI, TILESET, NAME, BLOCK");
@@ -802,47 +803,42 @@ class DFRawFunctions
 				$building_stage = $building_stage[0];}
 		}
 		echo "options=". implode(', ',array_diff($options_invalid,$options_limit)) ."<br/>";
-		$shopsum=array(); $shop=-1;
+		$shopsum=array();
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tag for required buildings
-		print_r($buildings);
+		echo "<br/> buildings=";print_r($buildings);
 		foreach ($tags as $i=>$tag)
 		{
 			// operates shop number
 			if (!array_diff(array($tag[0]), array("BUILDING_FURNACE", "BUILDING_WORKSHOP")))
-			$shop++;
-			
 			// defaults type_check value for every shop
-			if ($tag[0]==$building[0] and $tags[1]!=$building[1])
+			if (($tag[0]==="BUILDING_WORKSHOP")or($tag[0]==="BUILDING_FURNACE"))
 			{
 				$type_check = false;
 				$single_tag_counter=0; 
 				$item_counter=-1;
+				$building_tag_check=$tag; // contains building tag in case name is set
 			}
 			
 			// makes type_check true if shop name fits
-			if ($type_check==false)
-				foreach ($buildings as $i=>&$building)
-					if (($building[0]==="ANY" or $tag[0] == $building[0]) and $tag[1] === $building[1])
-					{
-						$type_check = true; 
-						$item_counter=-1; 
-						$shop_filtered++; echo $shop_filtered;
-						//echo "<br/>building="; print_r($building);
-					}unset($building);
-			
-			// contains building tag in case name is set
-			if (($tag[0]==="BUILDING_WORKSHOP")or($tag[0]==="BUILDING_FURNACE"))
-				$building_tag_check=$tag;
-				
+			if ($type_check === false)
+				foreach ($buildings as $i=>$building)
+					if (isset($tag[1]))
+						if ((($building[0] === "ANY" && in_array($tag[0], array("BUILDING_FURNACE", "BUILDING_WORKSHOP","NAME"))) or ($tag[0] === $building[0])) and $tag[1] === $building[1])
+						{
+							$type_check = true; 
+							$item_counter=-1;
+							$shop=$i;
+						}
+						
 			// substract every required data into big array - shopsum
-			if ($type_check === true and !in_array($tag[0],$options_limit) and $shop!=-1)
+			if ($type_check === true and !in_array($tag[0],$options_limit))
 			{
-				$addthat=&$shopsum[$shop_filtered][$tag[0]]; //abbreviation
+				$addthat=&$shopsum[$shop][$tag[0]]; //abbreviation
 				switch ($tag[0])
 				{	
 					case "NAME":
-						if (!isset($shopsum[$shop_filtered]["BUILDING_WORKSHOP"]) and !isset($shopsum[$shop_filtered]["BUILDING_FURNACE"]))
-						$shopsum[$shop_filtered][$building_tag_check[0]]=$building_tag_check[1];
+						if (!isset($shopsum[$shop]["BUILDING_WORKSHOP"]) and !isset($shopsum[$shop]["BUILDING_FURNACE"]))
+						$shopsum[$shop][$building_tag_check[0]]=$building_tag_check[1];
 					break;
 					case "BUILDING_WORKSHOP":
 					case "BUILDING_FURNACE":
@@ -853,7 +849,7 @@ class DFRawFunctions
 					case "DIM":
 						$addthat=array_slice($tag,1,3);break;
 					case "WORK_LOCATION":
-						$addthat=$tag[1]."&#x2715".$tag[2];break;
+						$addthat=array_slice($tag,2);break;
 					case "BLOCK":
 						$addthat[$tag[1]]=array_slice($tag,2);break;
 					case "TILE":
@@ -865,10 +861,9 @@ class DFRawFunctions
 					case "BUILD_ITEM":
 						$item_counter++; $single_tag_counter=0;
 						$addthat=array_slice($tag,1);
-						$shopsum[$shop_filtered]["SINGLE_TAG"][$item_counter]=array();
 						break;
 					default:
-						$shopsum[$shop_filtered]["SINGLE_TAG"][$item_counter][$single_tag_counter] = $tag;
+						$shopsum[$shop]["SINGLE_TAG"][$item_counter][$single_tag_counter] = $tag;
 						$single_tag_counter++;
 					break;
 				}
@@ -876,9 +871,10 @@ class DFRawFunctions
 				
 			}
 			$i++;
-			
+			if ($type_check === true and !in_array($tag[0],$options_limit))
+			echo implode(":",$tag)."<br/>";
 		}
-		//print_r($shopsum);
+		print_r($shopsum);
 		### Return dimensions
 		// if (in_array("DIM",$options))
 			// if ($output===FALSE){$output=implode("&#x2715;",$dim);}
