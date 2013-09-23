@@ -127,7 +127,7 @@ Makes HTML and wiki supported tiles from ones used in raws. Only TILE is mandato
 
 **Output:** Coloruful image
 
-**Test for wiki:** https://gist.github.com/6667595.git
+[Test for wiki](https://gist.github.com/Asvae/c6a648465c5595cba832#file-df_tile-wiki-test-page)
 
 df_raw
 ------
