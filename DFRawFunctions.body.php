@@ -758,6 +758,8 @@ class DFRawFunctions
 	*/
 	public static function getBuilding (&$parser, $data = '', $buildings = '', $options = '')
 	{
+		$mtime = microtime(); $mtime = explode(" ",$mtime); $mtime = $mtime[1] + $mtime[0]; $starttime = $mtime; 
+		
 		// Defining variables and input check
 		$tags = array(); $dim = array(); $block = array(); $color = array(); $tile = array(); $item=array(); $single_tag=array();
 		$j = 0; $i = 0; $type_check = FALSE;  $single_tag_counter=0; 
@@ -786,8 +788,14 @@ class DFRawFunctions
 		
 		// options_limit checks for unneeded options, those will be omitted later
 		$options_limit=$options_invalid;
-		foreach ($options as $option)
-		{	$invalid=array_diff($option, $options_invalid);
+		foreach ($options as &$option)
+		{	
+			// patches for specific options
+			if (in_array("TILESET",$option)){$option["tile"]="TILE";}
+			if (in_array("COLOR",$option)){$option["tile"]="TILE";}
+			if (in_array("BLOCK",$option)){$option["work_location"]="WORK_LOCATION";}
+			
+			$invalid=array_diff($option, $options_invalid);
 			if ($invalid)
 				return "<span class=\"error\">Unrecognized option: ".implode(', ',$invalid)."</span>";
 			$options_limit=array_diff($options_limit, $option);
@@ -796,64 +804,65 @@ class DFRawFunctions
 			if ($option["building_stage"]==false){$option["building_stage"]=3;
 			}else{	
 				$option["building_stage"] = $option["building_stage"][0];}
-			
-			// patch for tileset
-			if (in_array("TILESET",$option)){$option["tile"]="TILE";}
 		}
 		echo "options=". implode(', ',array_diff($options_invalid,$options_limit)) ."<br/>";
-		$shopsum=array();
+		// Break limit for NAME
+		$options_limit=array_diff($options_limit,array("NAME"));
+		$shopsum=array(); $shop=-1;
+		//echo "\n\r  buildings="; print_r($buildings);
 		// Extract arrays: dim (workshop dimensions), work_location, block, tile, color, item, single_tag from tag for required buildings
-		echo "<br/> buildings=";print_r($buildings);
 		foreach ($tags as $i=>$tag)
 		{	// operates shop number
 			if (!array_diff(array($tag[0]), array("BUILDING_FURNACE", "BUILDING_WORKSHOP")))
-			// defaults type_check value for every shop
-			if (($tag[0]==="BUILDING_WORKSHOP")or($tag[0]==="BUILDING_FURNACE"))
-			{	$type_check = false;
+			{	
+				$type_check = false;
 				$single_tag_counter=0; 
 				$item_counter=-1;
-				$building_tag_check=$tag; // holds building tag in case name is set
+				$building_tag=$tag; // holds building tag in case name is set
 			}
 			
 			// makes type_check true if shop name fits
 			if ($type_check === false)
 				foreach ($buildings as $i=>$building)
 					if (isset($tag[1]))
-						if ((($building[0] === "ANY" and in_array($tag[0], array("BUILDING_FURNACE", "BUILDING_WORKSHOP","NAME"))) or ($tag[0] === $building[0])) and $tag[1] === $building[1])
+						if ($building[1]==='ANY' or ((($building[0] === "ANY" and in_array($tag[0], array("BUILDING_FURNACE", "BUILDING_WORKSHOP","NAME"))) or ($tag[0] === $building[0])) and $tag[1] === $building[1]))
 						{
 							$type_check = true; 
 							$item_counter=-1;
-							$shop=$i;
+							$shop++;
 						}
 			
 
 			// substract every required data into big array - shopsum
 			if ($type_check === true and !in_array($tag[0],$options_limit))
-			{	switch ($tag[0])
-				{	case "NAME":
+			{	
+				switch ($tag[0])
+				{	
+					case "NAME":
+						$shopsum["BUILDING"][$shop]=$building_tag;
 					case "NAME_COLOR":
 					case "BUILD_LABOR":
 					case "BUILD_KEY":
 						$shopsum[$tag[0]][$shop]=$tag[1];break;
 					case "BUILDING_WORKSHOP":
 					case "BUILDING_FURNACE":
-						$shopsum["BUILDING"][$shop]=$tag[0];break;
+						break;
 					case "DIM":
 						$shopsum[$tag[0]][$shop]=array_slice($tag,1,3);break;
 					case "WORK_LOCATION":
-						$shopsum[$tag[0]][$shop]=array_slice($tag,2);break;
+						$shopsum[$tag[0]][$shop]=array_slice($tag,1);break;
 					case "BLOCK":
-						$shopsum[$tag[0]][$shop][$tag[1]]=array_slice($tag,2);break;
+						$shopsum[$tag[0]][$shop][$tag[1]-1]=array_slice($tag,2);break;
 					case "TILE":
-						$shopsum[$tag[0]][$shop][$tag[1]][$tag[2]]=array_slice($tag,3);break;
+						$shopsum[$tag[0]][$tag[1]][$shop][$tag[2]-1]=array_slice($tag,3);break;
 					case "COLOR":
-						$shopsum[$tag[0]][$shop][$tag[1]][$tag[2]]=array_slice($tag,3);break;
+						$shopsum[$tag[0]][$tag[1]][$shop][$tag[2]-1]=array_slice($tag,3);break;
 					case "NEEDS_MAGMA":
 						$shopsum[$tag[0]][$shop]=TRUE;break;
 					case "BUILD_ITEM":
 						$item_counter++; $single_tag_counter=0;
 						$shopsum[$tag[0]][$shop][$item_counter]=array_slice($tag,1);
-						break;
+					break;
 					default:
 						if (!in_array("BUILD_ITEM",$options_limit))
 						{
@@ -862,14 +871,13 @@ class DFRawFunctions
 						}
 					break;
 				}
+				//echo implode(':',$tag) ."\n\r";
 			}
-			// put name out of filter
-			if ($type_check === true and $tag[0]==="NAME")
-				$shopsum["BUILDING"][$shop]=$building_tag_check;
 		}
-		
-		echo "shopsum=";print_r ($shopsum);
-		echo count($shopsum).":".count($options);
+		//echo "\n\r  building_stage=".$option["building_stage"];
+		//echo "\n\r  array dimensions=".count($shopsum).":".count($options);
+		//echo "\n\r  tile_3="; print_r($shopsum['TILE'][3]);
+		//echo "\n\r  color_3="; print_r($shopsum['COLOR'][3]);
 		foreach ($options as $i=>$option)
 		{
 			for ($j=0; $j<=count($shopsum["BUILDING"])-1; $j++)
@@ -878,20 +886,52 @@ class DFRawFunctions
 					{$output[$i][$j]=implode("&#x2715;",$shopsum["DIM"][$i]);}
 				
 			}
+			
 			if (in_array("TILESET",$option))
 			{	// TILESET
 				$output[$i]=self::colorTile($parser, $shopsum['TILE'][$option["building_stage"]],'', "[[File:Phoebus 16x16.png|link=]]", 16);}
 			else
 			{	// TILE:COLOR
-				if (in_array('TILE',$option) and in_array("COLOR",$options))
+				if (in_array('TILE',$option) and in_array("COLOR",$option))
 				$output[$i]=self::colorTile($parser, $shopsum['TILE'][$option["building_stage"]], $shopsum["COLOR"][$option["building_stage"]]);
 				// TILE
-				if (in_array('TILE',$option) and !in_array("COLOR",$options))
+				if (in_array('TILE',$option) and !in_array("COLOR",$option))
 				$output[$i]=self::colorTile($parser, $shopsum['TILE'][$option["building_stage"]], '');
 				// COLOR
-				if (!in_array('TILE',$option) and in_array("COLOR",$options))
+				if (!in_array('TILE',$option) and in_array("COLOR",$option))
 				$output[$i]=self::colorTile($parser, '', $shopsum['COLOR'][$option["building_stage"]]);
 			}
+			if (in_array("BLOCK",$option))
+			{	
+				$block_tile=array(); $block_color=array();
+				for ($shop = 0; $shop<=(count($shopsum['BLOCK'])-1); $shop++)
+				{
+					$block_work_location=$shopsum["WORK_LOCATION"][$shop];
+					$dim_1=count($shopsum['BLOCK'][$shop]);
+					$dim_0=count($shopsum['BLOCK'][$shop][0]);
+					for ($i_ = 0; $i_ <= ($dim_1-1); $i_++)
+					{
+						$block_color[$shop][$i_]=array();
+						
+						for ($j_ = 0; $j_ <= ($dim_0-1); $j_++)
+						{	$block_tile[$shop][$i_][]='114';
+							if ($block_work_location[0]-1===$j_ and $block_work_location[1]-1===$i_)
+							{
+								array_push($block_color[$shop][$i_],'3','7','0');
+							}
+							elseif ($shopsum['BLOCK'][$shop][$i_][$j_]===0)
+							{
+								array_push($block_color[$shop][$i_],'7','0','0');
+							}else{
+								array_push($block_color[$shop][$i_],'7','3','1');
+							}
+						}
+					}
+					
+				}
+				$output[$i]=self::colorTile($parser, $block_tile, $block_color);
+			}
+			
 		}
 		echo "output=";print_r($output);
 		
@@ -962,6 +1002,8 @@ class DFRawFunctions
 		// return array( $output, 'nowiki' => true );
 		
 		// return $output;
+		
+		$mtime = microtime();$mtime = explode(" ",$mtime);$mtime = $mtime[1] + $mtime[0]; $endtime = $mtime; $totaltime = ($endtime - $starttime); echo "This page was created in ".$totaltime." seconds"; 
 	}
 	
 	
@@ -1057,24 +1099,23 @@ class DFRawFunctions
 	
 	// returns html values of tile and color taken meaningful strings from raws (without building stage and line)
 	// meant to be used in par with
-	// !!! ADD 1 COLOR SUPPORT
-	public static function colorTile (&$parser, $tile='', $color='', $image='', $step='')
-	{	if((is_string($color) and $color!=='')or(is_string($tile) and $tile!==''))
-		{
-		if (($image !=='' and $step==='')or($image ==='' and $step!=='')){return '<span class="error">Either image or step are missing!</span>';}
-		if (gettype($tile)!=="string" and $tile!==''){return '<span class="error">Tile for df_ile must be string!</span>';}
-		if (gettype($color)!=="string" and $color!==''){
-		return '<span class="error">Color for df_tile must be string!</span>';}
-		//echo "<br/>TILE (in funct)=".$tile;
-		}
+	public static function colorTile (&$parser, $tile='', $color='', $image='', $step='', $options='')
+	{	
+		$string_input=false; 
+		if (is_string($tile) and is_string($color))
+			$string_input=true;
+		if($string_input)
+			if (($image !=='' and $step==='')or($image ==='' and $step!=='')){return '<span class="error">Either image or step are missing!</span>';}
+			
+		$options=explode(':',$options);
 		
 		// TILE
 		if ($tile!=='')
 		{	$conv_unicode=explode(" "," &#x263A; &#x263B; &#x2665; &#x2666; &#x2663; &#x2660; &#x2022; &#x25D8; &#x25CB; &#x25D9; &#x2642; &#x2640; &#x266A; &#x266B; &#x263C; &#x25BA; &#x25C4; &#x2195; &#x203C; &#x00B6; &#x00A7; &#x25AC; &#x21A8; &#x2191; &#x2193; &#x2192; &#x2190; &#x221F; &#x2194; &#x25B2; &#x25BC; &nbsp; &#x0021; &#x0022; &#x0023; &#x0024; &#x0025; &#x0026; &#x0027; &#x0028; &#x0029; &#x002A; &#x002B; &#x002C; &#x002D; &#x002E; &#x002F; &#x0030; &#x0031; &#x0032; &#x0033; &#x0034; &#x0035; &#x0036; &#x0037; &#x0038; &#x0039; &#x003A; &#x003B; &#x003C; &#x003D; &#x003E; &#x003F; &#x0040; &#x0041; &#x0042; &#x0043; &#x0044; &#x0045; &#x0046; &#x0047; &#x0048; &#x0049; &#x004A; &#x004B; &#x004C; &#x004D; &#x004E; &#x004F; &#x0050; &#x0051; &#x0052; &#x0053; &#x0054; &#x0055; &#x0056; &#x0057; &#x0058; &#x0059; &#x005A; &#x005B; &#x005C; &#x005D; &#x005E; &#x005F; &#x0060; &#x0061; &#x0062; &#x0063; &#x0064; &#x0065; &#x0066; &#x0067; &#x0068; &#x0069; &#x006A; &#x006B; &#x006C; &#x006D; &#x006E; &#x006F; &#x0070; &#x0071; &#x0072; &#x0073; &#x0074; &#x0075; &#x0076; &#x0077; &#x0078; &#x0079; &#x007A; &#x007B; &#x007C; &#x007D; &#x007E; &#x2302; &#x00C7; &#x00FC; &#x00E9; &#x00E2; &#x00E4; &#x00E0; &#x00E5; &#x00E7; &#x00EA; &#x00EB; &#x00E8; &#x00EF; &#x00EE; &#x00EC; &#x00C4; &#x00C5; &#x00C9; &#x00E6; &#x00C6; &#x00F4; &#x00F6; &#x00F2; &#x00FB; &#x00F9; &#x00FF; &#x00D6; &#x00DC; &#x00A2; &#x00A3; &#x00A5; &#x20A7; &#x0192; &#x00E1; &#x00ED; &#x00F3; &#x00FA; &#x00F1; &#x00D1; &#x00AA; &#x00BA; &#x00BF; &#x2310; &#x00AC; &#x00BD; &#x00BC; &#x00A1; &#x00AB; &#x00BB; &#x2591; &#x2592; &#x2593; &#x2502; &#x2524; &#x2561; &#x2562; &#x2556; &#x2555; &#x2563; &#x2551; &#x2557; &#x255D; &#x255C; &#x255B; &#x2510; &#x2514; &#x2534; &#x252C; &#x251C; &#x2500; &#x253C; &#x255E; &#x255F; &#x255A; &#x2554; &#x2569; &#x2566; &#x2560; &#x2550; &#x256C; &#x2567; &#x2568; &#x2564; &#x2565; &#x2559; &#x2558; &#x2552; &#x2553; &#x256B; &#x256A; &#x2518; &#x250C; &#x2588; &#x2584; &#x258C; &#x2590; &#x2580; &#x03B1; &#x00DF; &#x0393; &#x03C0; &#x03A3; &#x03C3; &#x00B5; &#x03C4; &#x03A6; &#x0398; &#x03A9; &#x03B4; &#x221E; &#x03C6; &#x03B5; &#x2229; &#x2261; &#x00B1; &#x2265; &#x2264; &#x2320; &#x2321; &#x00F7; &#x2248; &#x00B0; &#x2219; &#x00B7; &#x221A; &#x207F; &#x00B2; &#x25A0;");
 			
 			// string input support
-			if ($tile!=='' and !is_array($color) and !is_array($tile))
-			{	$tile_tmp=explode('<br/>',$tile);
+			if ($tile!=='' and $string_input)
+			{	$tile_tmp=explode(';',$tile);
 				unset($tile);
 				foreach ($tile_tmp as &$tile_row)
 				$tile_row=explode(':',$tile_row);
@@ -1086,20 +1127,26 @@ class DFRawFunctions
 		// COLOR
 		if ($color!=='')
 		{	$conv_color_foregr=array("0:0" => "#000000", "1:0" => "#000080", "2:0" => "#008000", "3:0" => "#008080", "4:0" => "#800000", "5:0" => "#800080", "6:0" => "#808000", "7:0" => "#C0C0C0", "0:1" => "#808080", "1:1" => "#0000FF", "2:1" => "#00FF00", "3:1" => "#00FFFF", "4:1" => "#FF0000", "5:1" => "#FF00FF", "6:1" => "#FFFF00", "7:1" => "#FFFFFF", "0:0:0" => "#000000", "1:0:0" => "#000080", "2:0:0" => "#008000", "3:0:0" => "#008080", "4:0:0" => "#800000", "5:0:0" => "#800080", "6:0:0" => "#808000", "7:0:0" => "#C0C0C0", "0:0:1" => "#808080", "1:0:1" => "#0000FF", "2:0:1" => "#00FF00", "3:0:1" => "#00FFFF", "4:0:1" => "#FF0000", "5:0:1" => "#FF00FF", "6:0:1" => "#FFFF00", "7:0:1" => "#FFFFFF", " 0:1:0" => "#000000", "1:1:0" => "#000080", "2:1:0" => "#008000", "3:1:0" => "#008080", "4:1:0" => "#800000", "5:1:0" => "#800080", "6:1:0" => "#808000", "7:1:0" => "#C0C0C0", "0:1:1" => "#808080", "1:1:1" => "#0000FF", "2:1:1" => "#00FF00", "3:1:1" => "#00FFFF", "4:1:1" => "#FF0000", "5:1:1" => "#FF00FF", "6:1:1" => "#FFFF00", "7:1:1" => "#FFFFFF", " 0:2:0" => "#000000", "1:2:0" => "#000080", "2:2:0" => "#008000", "3:2:0" => "#008080", "4:2:0" => "#800000", "5:2:0" => "#800080", "6:2:0" => "#808000", "7:2:0" => "#C0C0C0", "0:2:1" => "#808080", "1:2:1" => "#0000FF", "2:2:1" => "#00FF00", "3:2:1" => "#00FFFF", "4:2:1" => "#FF0000", "5:2:1" => "#FF00FF", "6:2:1" => "#FFFF00", "7:2:1" => "#FFFFFF", " 0:3:0" => "#000000", "1:3:0" => "#000080", "2:3:0" => "#008000", "3:3:0" => "#008080", "4:3:0" => "#800000", "5:3:0" => "#800080", "6:3:0" => "#808000", "7:3:0" => "#C0C0C0", "0:3:1" => "#808080", "1:3:1" => "#0000FF", "2:3:1" => "#00FF00", "3:3:1" => "#00FFFF", "4:3:1" => "#FF0000", "5:3:1" => "#FF00FF", "6:3:1" => "#FFFF00", "7:3:1" => "#FFFFFF", " 0:4:0" => "#000000", "1:4:0" => "#000080", "2:4:0" => "#008000", "3:4:0" => "#008080", "4:4:0" => "#800000", "5:4:0" => "#800080", "6:4:0" => "#808000", "7:4:0" => "#C0C0C0", "0:4:1" => "#808080", "1:4:1" => "#0000FF", "2:4:1" => "#00FF00", "3:4:1" => "#00FFFF", "4:4:1" => "#FF0000", "5:4:1" => "#FF00FF", "6:4:1" => "#FFFF00", "7:4:1" => "#FFFFFF", " 0:5:0" => "#000000", "1:5:0" => "#000080", "2:5:0" => "#008000", "3:5:0" => "#008080", "4:5:0" => "#800000", "5:5:0" => "#800080", "6:5:0" => "#808000", "7:5:0" => "#C0C0C0", "0:5:1" => "#808080", "1:5:1" => "#0000FF", "2:5:1" => "#00FF00", "3:5:1" => "#00FFFF", "4:5:1" => "#FF0000", "5:5:1" => "#FF00FF", "6:5:1" => "#FFFF00", "7:5:1" => "#FFFFFF", " 0:6:0" => "#000000", "1:6:0" => "#000080", "2:6:0" => "#008000", "3:6:0" => "#008080", "4:6:0" => "#800000", "5:6:0" => "#800080", "6:6:0" => "#808000", "7:6:0" => "#C0C0C0", "0:6:1" => "#808080", "1:6:1" => "#0000FF", "2:6:1" => "#00FF00", "3:6:1" => "#00FFFF", "4:6:1" => "#FF0000", "5:6:1" => "#FF00FF", "6:6:1" => "#FFFF00", "7:6:1" => "#FFFFFF", "0:7:0" => "#000000", "1:7:0" => "#000080", "2:7:0" => "#008000", "3:7:0" => "#008080", "4:7:0" => "#800000", "5:7:0" => "#800080", "6:7:0" => "#808000", "7:7:0" => "#C0C0C0", "0:7:1" => "#808080", "1:7:1" => "#0000FF", "2:7:1" => "#00FF00", "3:7:1" => "#00FFFF", "4:7:1" => "#FF0000", "5:7:1" => "#FF00FF", "6:7:1" => "#FFFF00", "7:7:1" => "#FFFFFF");
-		$conv_color_backgr=array("0:0" => "#000000", "1:0" => "#000000", "2:0" => "#000000", "3:0" => "#000000", "4:0" => "#000000", "5:0" => "#000000", "6:0" => "#000000", "7:0" => "#000000", "0:1" => "#000000", "1:1" => "#000000", "2:1" => "#000000", "3:1" => "#000000", "4:1" => "#000000", "5:1" => "#000000", "6:1" => "#000000", "7:1" => "#000000", "0:0:0" => "#000000", "1:0:0" => "#000000", "2:0:0" => "#000000", "3:0:0" => "#000000", "4:0:0" => "#000000", "5:0:0" => "#000000", "6:0:0" => "#000000", "7:0:0" => "#000000", "0:0:1" => "#000000", "1:0:1" => "#000000", "2:0:1" => "#000000", "3:0:1" => "#000000", "4:0:1" => "#000000", "5:0:1" => "#000000", "6:0:1" => "#000000", "7:0:1" => "#000000", "0:1:0" => "#000080", "1:1:0" => "#000080", "2:1:0" => "#000080", "3:1:0" => "#000080", "4:1:0" => "#000080", "5:1:0" => "#000080", "6:1:0" => "#000080", "7:1:0" => "#000080", "0:1:1" => "#000080", "1:1:1" => "#000080", "2:1:1" => "#000080", "3:1:1" => "#000080", "4:1:1" => "#000080", "5:1:1" => "#000080", "6:1:1" => "#000080", "7:1:1" => "#000080", "0:2:0" => "#008000", "1:2:0" => "#008000", "2:2:0" => "#008000", "3:2:0" => "#008000", "4:2:0" => "#008000", "5:2:0" => "#008000", "6:2:0" => "#008000", "7:2:0" => "#008000", "0:2:1" => "#008000", "1:2:1" => "#008000", "2:2:1" => "#008000", "3:2:1" => "#008000", "4:2:1" => "#008000", "5:2:1" => "#008000", "6:2:1" => "#008000", "7:2:1" => "#008000", "0:3:0" => "#008080", "1:3:0" => "#008080", "2:3:0" => "#008080", "3:3:0" => "#008080", "4:3:0" => "#008080", "5:3:0" => "#008080", "6:3:0" => "#008080", "7:3:0" => "#008080", "0:3:1" => "#008080", "1:3:1" => "#008080", "2:3:1" => "#008080", "3:3:1" => "#008080", "4:3:1" => "#008080", "5:3:1" => "#008080", "6:3:1" => "#008080", "7:3:1" => "#008080", "0:4:0" => "#800000", "1:4:0" => "#800000", "2:4:0" => "#800000", "3:4:0" => "#800000", "4:4:0" => "#800000", "5:4:0" => "#800000", "6:4:0" => "#800000", "7:4:0" => "#800000", "0:4:1" => "#800000", "1:4:1" => "#800000", "2:4:1" => "#800000", "3:4:1" => "#800000", "4:4:1" => "#800000", "5:4:1" => "#800000", "6:4:1" => "#800000", "7:4:1" => "#800000", "0:5:0" => "#800080", "1:5:0" => "#800080", "2:5:0" => "#800080", "3:5:0" => "#800080", "4:5:0" => "#800080", "5:5:0" => "#800080", "6:5:0" => "#800080", "7:5:0" => "#800080", "0:5:1" => "#800080", "1:5:1" => "#800080", "2:5:1" => "#800080", "3:5:1" => "#800080", "4:5:1" => "#800080", "5:5:1" => "#800080", "6:5:1" => "#800080", "7:5:1" => "#800080", "0:6:0" => "#808000", "1:6:0" => "#808000", "2:6:0" => "#808000", "3:6:0" => "#808000", "4:6:0" => "#808000", "5:6:0" => "#808000", "6:6:0" => "#808000", "7:6:0" => "#808000", "0:6:1" => "#808000", "1:6:1" => "#808000", "2:6:1" => "#808000", "3:6:1" => "#808000", "4:6:1" => "#808000", "5:6:1" => "#808000", "6:6:1" => "#808000", "7:6:1" => "#808000", "0:7:0" => "#C0C0C0", "1:7:0" => "#C0C0C0", "2:7:0" => "#C0C0C0", "3:7:0" => "#C0C0C0", "4:7:0" => "#C0C0C0", "5:7:0" => "#C0C0C0", "6:7:0" => "#C0C0C0", "7:7:0" => "#C0C0C0", "0:7:1" => "#C0C0C0", "1:7:1" => "#C0C0C0", "2:7:1" => "#C0C0C0", "3:7:1" => "#C0C0C0", "4:7:1" => "#C0C0C0", "5:7:1" => "#C0C0C0", "6:7:1" => "#C0C0C0", "7:7:1" => "#C0C0C0");}
+		$conv_color_backgr=array("0:0" => "#000000", "1:0" => "#000000", "2:0" => "#000000", "3:0" => "#000000", "4:0" => "#000000", "5:0" => "#000000", "6:0" => "#000000", "7:0" => "#000000", "0:1" => "#000000", "1:1" => "#000000", "2:1" => "#000000", "3:1" => "#000000", "4:1" => "#000000", "5:1" => "#000000", "6:1" => "#000000", "7:1" => "#000000", "0:0:0" => "#000000", "1:0:0" => "#000000", "2:0:0" => "#000000", "3:0:0" => "#000000", "4:0:0" => "#000000", "5:0:0" => "#000000", "6:0:0" => "#000000", "7:0:0" => "#000000", "0:0:1" => "#000000", "1:0:1" => "#000000", "2:0:1" => "#000000", "3:0:1" => "#000000", "4:0:1" => "#000000", "5:0:1" => "#000000", "6:0:1" => "#000000", "7:0:1" => "#000000", "0:1:0" => "#000080", "1:1:0" => "#000080", "2:1:0" => "#000080", "3:1:0" => "#000080", "4:1:0" => "#000080", "5:1:0" => "#000080", "6:1:0" => "#000080", "7:1:0" => "#000080", "0:1:1" => "#000080", "1:1:1" => "#000080", "2:1:1" => "#000080", "3:1:1" => "#000080", "4:1:1" => "#000080", "5:1:1" => "#000080", "6:1:1" => "#000080", "7:1:1" => "#000080", "0:2:0" => "#008000", "1:2:0" => "#008000", "2:2:0" => "#008000", "3:2:0" => "#008000", "4:2:0" => "#008000", "5:2:0" => "#008000", "6:2:0" => "#008000", "7:2:0" => "#008000", "0:2:1" => "#008000", "1:2:1" => "#008000", "2:2:1" => "#008000", "3:2:1" => "#008000", "4:2:1" => "#008000", "5:2:1" => "#008000", "6:2:1" => "#008000", "7:2:1" => "#008000", "0:3:0" => "#008080", "1:3:0" => "#008080", "2:3:0" => "#008080", "3:3:0" => "#008080", "4:3:0" => "#008080", "5:3:0" => "#008080", "6:3:0" => "#008080", "7:3:0" => "#008080", "0:3:1" => "#008080", "1:3:1" => "#008080", "2:3:1" => "#008080", "3:3:1" => "#008080", "4:3:1" => "#008080", "5:3:1" => "#008080", "6:3:1" => "#008080", "7:3:1" => "#008080", "0:4:0" => "#800000", "1:4:0" => "#800000", "2:4:0" => "#800000", "3:4:0" => "#800000", "4:4:0" => "#800000", "5:4:0" => "#800000", "6:4:0" => "#800000", "7:4:0" => "#800000", "0:4:1" => "#800000", "1:4:1" => "#800000", "2:4:1" => "#800000", "3:4:1" => "#800000", "4:4:1" => "#800000", "5:4:1" => "#800000", "6:4:1" => "#800000", "7:4:1" => "#800000", "0:5:0" => "#800080", "1:5:0" => "#800080", "2:5:0" => "#800080", "3:5:0" => "#800080", "4:5:0" => "#800080", "5:5:0" => "#800080", "6:5:0" => "#800080", "7:5:0" => "#800080", "0:5:1" => "#800080", "1:5:1" => "#800080", "2:5:1" => "#800080", "3:5:1" => "#800080", "4:5:1" => "#800080", "5:5:1" => "#800080", "6:5:1" => "#800080", "7:5:1" => "#800080", "0:6:0" => "#808000", "1:6:0" => "#808000", "2:6:0" => "#808000", "3:6:0" => "#808000", "4:6:0" => "#808000", "5:6:0" => "#808000", "6:6:0" => "#808000", "7:6:0" => "#808000", "0:6:1" => "#808000", "1:6:1" => "#808000", "2:6:1" => "#808000", "3:6:1" => "#808000", "4:6:1" => "#808000", "5:6:1" => "#808000", "6:6:1" => "#808000", "7:6:1" => "#808000", "0:7:0" => "#C0C0C0", "1:7:0" => "#C0C0C0", "2:7:0" => "#C0C0C0", "3:7:0" => "#C0C0C0", "4:7:0" => "#C0C0C0", "5:7:0" => "#C0C0C0", "6:7:0" => "#C0C0C0", "7:7:0" => "#C0C0C0", "0:7:1" => "#C0C0C0", "1:7:1" => "#C0C0C0", "2:7:1" => "#C0C0C0", "3:7:1" => "#C0C0C0", "4:7:1" => "#C0C0C0", "5:7:1" => "#C0C0C0", "6:7:1" => "#C0C0C0", "7:7:1" => "#C0C0C0");
 			
 			// string input support
-			if ($color!=='' and !is_array($color) and !is_array($tile))
+			if ($color!=='' and $string_input)
 			{	// single color support
-				if (strlen($color)<=6)
-				{	$f=false;
-					if ($color[0]==="B")
-						return $conv_color_backgr[substr($color,1)];
-					return $conv_color_foregr[substr($color,1)];
-						
+				if (strlen($color)<=6 and $tile==='')
+				{	switch ($color[0])
+					{	case "B":
+							$color = $conv_color_backgr[substr($color,1)];
+						break;
+						case "F":
+							$color = $conv_color_foregr[substr($color,1)];
+						break;
+						default:
+						$color = $conv_color_foregr[$color];
+						break;
+					}
+					return  substr($color,1);	
 				}
-				$color_backgr=''; $color_foregr='';
-				$color_tmp=explode("<br/>",$color);
+				$color_tmp=explode(";",$color);
 				unset($color);
 				foreach ($color_tmp as &$color_row)
 					$color_row=explode(":",$color_row);
@@ -1110,79 +1157,74 @@ class DFRawFunctions
 			$tmp=array();
 			foreach ($color as &$shopcolor)
 				foreach ($shopcolor as &$color_row)
-				{	for ($i=0;$i<=count($color_row)-1;$i++)
-						$tmp[]=implode(":",array_slice ($color_row,$i*3,3));
+				{	for ($j=0;$j<=count($color_row)/3-1;$j++)
+						$tmp[]=implode(":",array_slice ($color_row,$j*3,3));
 					$color_row=$tmp;
 					$tmp=array();
 				}
-				
-		$shops=count($color);	
-		
-		$tile_color[$shop]='<table /border=0 cellpadding=0 cellspacing=0 style="'."font-size:150%; font-family: 'Courier New', monospace; font-weight:bold".'"><tr>';
-		for ($shop=0; $shop<=$shops-1; $shop++)
-		{	$dim_1=count($color[$shop]);
-			if ($color[$shop]!='' and $tile[$shop]!='' and count($color[$shop])!=count($tile[$shop]))
-				return '<span class="error">Dimension mismatch for color and tile in colorTile.</span>';
-		
-		// !!!	
-		if (false and $image){
-			for ($i = 1; $i <= ($dim_1); $i++)
-			{	for ($j = 1; $j <= ($dim_0); $j++)
-				{
-					$value=$tile_reserve[($i-1)*$dim_0+$j-1];
-					$x=$value%16; $y=intval($value/16);
-					//echo "<br/>x=".$x.", y=".$y. ", value=".$value;
-					
-					if ($color==='')
-					{
-						$tile_color[$shop] .= 
-						'<td><div style="width:16px;height:16px;overflow:hidden;position:relative"><div style="position:relative;top:-'. $y*$step .'px;left:-' .$x*$step. 'px">'. $image .'</div></div>'
-						.'</td>';
-						//echo "<br/> sum=".($i*$dim_0+$j)." ".$j;
-					}
-					//<span style="color: '. $color_foregr_tmp[$j-1] .'; background:'. $color_backgr_tmp[$j-1].'">
-					if ($tile!=='' and $color!=='')
-					{	
-						/* echo $color_backgr_tmp[$j-1];
-						$tile_color[$shop] .= 
-						'<td><div style="background:'.$color_backgr_tmp[$j-1].';width:'. $step .';height:'. $step .';overflow:hidden;position:relative"><div style="position:relative;top:-'. $y*$step .'px;left:-' .$x*$step. 'px">'. $image .'</div></div></td>'; */
-						echo $color_backgr_tmp[$j-1];
-						$tile_color[$shop] .= 
-						'<td><div style="background:'.$color_backgr_tmp[$j-1].';width:'. $step .';height:'. $step .';overflow:hidden;position:relative"><div style="position:relative;top:-'. $y*$step .'px;left:-' .$x*$step. 'px">'. $image .'</div></div></td>';
-						
-					}
-					if ($j==$dim_0){$tile_color[$shop] .='</tr>';}
-				}
-				
-				if (($i!=$dim_1) and ($j!=$dim_0)){$tile_color[$shop] .='<tr>';
-				} else {$tile_color[$shop] .='</table>';}
-			}
-		}	
-		
-			if ($color==='')
-				for ($i = 0; $i <= ($dim_1-1); $i++)
-				{	for ($j = 0; $j <= ($dim_0-1); $j++)
-					{	$tile_tmp=$conv_unicode[$tile[$shop][$i][$j]];
-						$tile_color[$shop] .= '<td>'.$tile_tmp.'</td>';
-						if ($j==$dim_0-1){$tile_color[$shop] .='</tr>';}
-					}
-					if (($i!=$dim_1-1) and ($j!=$dim_0-1)){$tile_color[$shop] .='<tr>';
-					} else {$tile_color[$shop] .='</table>';}
-				}
-			if ($tile!=='' and $color!=='')
-				for ($i = 0; $i <= ($dim_1-1); $i++)
-				{	for ($j = 0; $j <= ($dim_0-1); $j++)
-					{	$tile_tmp=$conv_unicode[$tile[$shop][$i][$j]];
-						$color_backgr_tmp=$conv_color_backgr[$color[$shop][$i][$j]];
-						$color_foregr_tmp=$conv_color_foregr[$color[$shop][$i][$j]];
-						$tile_color[$shop] .= '<td><span style="color: '. $color_foregr_tmp .'; background:'. $color_backgr_tmp.'">'.$tile_tmp.'</span></td>';
-						if ($j==$dim_0-1){$tile_color[$shop] .='</tr>';}
-					}
-				if (($i!=$dim_1-1) and ($j!=$dim_0-1)){$tile_color[$shop] .='<tr>';}
-				else {$tile_color[$shop] .='</table>';}	
-				}
-			return $tile_color;
+			
 		}
+		
+		// Array to HTML conversion
+		for ($shop=0; $shop<=count($tile)-1; $shop++)
+		{	
+			$dim_1=count($tile[$shop]); $dim_0=count($tile[$shop][0]);
+			$tile_color[$shop]='<table /border=0 cellpadding=0 cellspacing=0 style="'."font-size:150%; font-family: 'Courier New', monospace; font-weight:bold".'"><tr>';
+			if ($color!=='' and $tile!=='' and count($color[$shop])!=count($tile[$shop]))
+				return '<span class="error">Dimension mismatch for color and tile in colorTile ('.count($color[$shop]).' vs '.count($tile[$shop]).').</span>';
+		
+			if ($image)
+			{	
+				// disable color for tiles
+				for ($i = 0; $i <= ($dim_1-1); $i++)
+				{	
+					$dim_0=count($color[$shop][$i]);
+					$tile_color[$shop] .='<tr>';
+					for ($j = 0; $j <= ($dim_0-1); $j++)
+					{	
+						$tile_value=$tile[$shop][$i][$j];
+						$x=$tile_value%16; $y=intval($tile_value/16);
+						$tile_color[$shop] .= '<td><div style="width:16px;height:16px;overflow:hidden;position:relative"><div style="position:relative;top:-'. $y*$step .'px;left:-' .$x*$step. 'px">'.$image.'</div></div>'.'</td>';
+						if ($j==$dim_0-1){$tile_color[$shop].='</tr>';}
+					}
+					
+					if ($i===$dim_1-1 and $j===$dim_0-1)
+						$tile_color[$shop] .='</table>';
+				}
+			}
+			else
+			{
+				if ($color === '')
+					for ($i = 0; $i <= ($dim_1-1); $i++)
+					{	for ($j = 0; $j <= ($dim_0-1); $j++)
+						{	$tile_tmp=$conv_unicode[$tile[$shop][$i][$j]];
+							$tile_color[$shop] .= '<td>'.$tile_tmp.'</td>';
+							if ($j==$dim_0-1){$tile_color[$shop] .='</tr>';}
+						}
+						if (($i!=$dim_1-1) and ($j!=$dim_0-1)){$tile_color[$shop] .='<tr>';
+						} else {$tile_color[$shop] .='</table>';}
+					}
+				if ($tile!='' and $color!='')
+					for ($i = 0; $i <= ($dim_1-1); $i++)
+					{	for ($j = 0; $j <= ($dim_0-1); $j++)
+						{	$tile_tmp=$conv_unicode[$tile[$shop][$i][$j]];
+							$color_backgr_tmp=$conv_color_backgr[$color[$shop][$i][$j]];
+							$color_foregr_tmp=$conv_color_foregr[$color[$shop][$i][$j]];
+							$tile_color[$shop] .= '<td><span style="color: '. $color_foregr_tmp .'; background:'. $color_backgr_tmp.'">'.$tile_tmp.'</span></td>';
+							if ($j==$dim_0-1){$tile_color[$shop] .='</tr>';}
+						}
+						if (($i!=$dim_1-1) and ($j!=$dim_0-1)){$tile_color[$shop] .='<tr>';}
+						else {$tile_color[$shop] .='</table>';}	
+					}
+			}
+		}
+		
+		if($string_input)
+			$tile_color=$tile_color[0];
+		
+		if (in_array("NOWIKI",$options))
+			return array( $tile_color, 'nowiki' => true );
+		return $tile_color;
 	}
 	
 	// delimiters has to be an Array
