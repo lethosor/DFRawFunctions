@@ -127,6 +127,8 @@ Makes HTML and wiki supported tiles from ones used in raws. Only TILE is mandato
 
 **Output:** Coloruful image
 
+**Test for wiki:** https://gist.github.com/6667595.git
+
 df_raw
 ------
 Searches through a raw file and returns raws for a specific object. If
