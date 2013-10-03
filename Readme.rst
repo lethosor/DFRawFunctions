@@ -87,12 +87,14 @@ Usage: ``{{#df_building:data|duilding|options}}``
 
 * building - should be either workshop or furnace with syntax as follows:  ``BUILDING_FURNACE:MAGMA_GENERATOR`` or ``NAME:Magma Generator (Dwarf)``.
 * options - you have to put ":" between parameters, their position won't matter.
+  List of options:
  * ``LOCATION`` - returnts tiled image, depicting passability and work location (not implemented)
  * ``TILE`` - returns tiled image of workshop
  * ``COLOR`` - returns tiled and coloured image of workshop
  * ``N`` - where N is 0, 1 or 2, specifies building stage (3 by default)
  * ``BUILD_ITEM`` - returns build items with quantities
  * ``NOWIKI`` - output without wiki formating
+ * ``TILESET`` - forces the use of graphical tileset instead of ascii tiles
 
 Example 1::
 
@@ -125,6 +127,8 @@ Makes HTML and wiki supported tiles from ones used in raws. Only TILE is mandato
 
 **Output:** Coloruful image
 
+[Test for wiki](https://gist.github.com/Asvae/c6a648465c5595cba832#file-df_tile-wiki-test-page)
+
 df_raw
 ------
 Searches through a raw file and returns raws for a specific object. If
@@ -144,7 +148,13 @@ Parameters:
 * notfound
 - The string to be returned if the specified entity could not be located.
 
-Example: {{#df_raw:DF2012:creature_standard.txt|CREATURE|DWARF|Not found!}}
+Example::
+
+{{{#df_raw:DF2012:creature_standard.txt|CREATURE|DWARF|Not found!}}
+
+Output:: 
+
+Dwarf raws
 
 df_tag
 ------
